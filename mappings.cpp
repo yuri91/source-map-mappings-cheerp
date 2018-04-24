@@ -3,6 +3,7 @@
 #include <memory>
 #include <cstring>
 #include <iostream>
+#include <cheerp/client.h>
 
 enum Error {
 	NoError = 0,
@@ -78,7 +79,7 @@ static uint32_t base64_decode(char in) {
 		return in - '0' + ('Z' - 'A') + ('z' - 'a') + 2;
 	}
 }
-static int64_t vlq_decode(const char*& it) {
+static int64_t vlq_decode(std::string::iterator& it) {
 	int64_t r = 0;
 	uint32_t shift = 0;
 	bool hasContinuationBit = false;
@@ -94,7 +95,7 @@ static int64_t vlq_decode(const char*& it) {
 	r >>= 1;
 	return shouldNegate ? -r : r ;
 }
-static void read_relative_vlq(uint32_t& prev, const char*& it) {
+static void read_relative_vlq(uint32_t& prev, std::string::iterator& it) {
 	int64_t decoded = vlq_decode(it);
 	// TODO check error
 	int64_t v = decoded + prev;
@@ -110,17 +111,12 @@ extern "C" int get_last_error() {
 	return last_error;
 }
 
-[[cheerp::jsexport]]
-extern "C" char* allocate_mappings(size_t size) {
-	return new char[size];
-}
-[[cheerp::jsexport]]
-extern "C" Mappings* parse_mappings(const char* input) {
+static Mappings* parse_mappings_impl(std::string input) {
 	std::unique_ptr<Mappings> mappings = std::make_unique<Mappings>();
 
-	const char* in_begin = input;
-	uint32_t in_len = strlen(input);
-	const char* in_end = in_begin + in_len;
+	auto in_begin = input.begin();
+	uint32_t in_len = input.size();
+	auto in_end = input.end();
 	uint32_t generated_line = 0;
 	uint32_t generated_column = 0;
 	uint32_t original_line = 0;
@@ -138,7 +134,7 @@ extern "C" Mappings* parse_mappings(const char* input) {
 		}
 		return false;
 	};
-	for (const char* it = in_begin; it != in_end;) {
+	for (auto it = in_begin; it != in_end;) {
 		if (*it ==  ';') {
 			generated_line++;
 			generated_column = 0;
@@ -189,16 +185,23 @@ extern "C" Mappings* parse_mappings(const char* input) {
 		          comp);
 	}
 	mappings->by_generated = std::move(by_generated);
-	delete[] input;
 	return mappings.release();
 }
+
+[[cheerp::jsexport]]
+[[cheerp::genericjs]]
+extern "C" Mappings* parse_mappings(client::String js_input) {
+	std::string input(js_input);
+	return parse_mappings_impl(std::move(input));
+}
+
 [[cheerp::jsexport]]
 extern "C" void free_mappings(Mappings* mappings) {
 	delete mappings;
 }
 
 int main() {
-	const char testbase[] = {'A', 'Z', 'a', 'z', '0', '9', '/'};
+	char testbase[] = {'A', 'Z', 'a', 'z', '0', '9', '/'};
 
 	std::cout<<"------------------------------------------"<<std::endl;
 	for(int i = 0; i < 7; i++) {
@@ -210,18 +213,17 @@ int main() {
 	}
 	std::cout<<"------------------------------------------"<<std::endl;
 
-	const char* test[] = {"A", "C", "D", "2H", "qxmvrH"};
+	std::string test[] = {"A", "C", "D", "2H", "qxmvrH"};
 
 	for(int i = 0; i < 5; i++) {
-		std::cout<<"test vlq "<<i<<":"<<test[i]<<" -> "<<vlq_decode(test[i])<<std::endl;
+		auto it = test[i].begin();
+		std::cout<<"test vlq "<<i<<":"<<test[i]<<" -> "<<vlq_decode(it)<<std::endl;
+		assert(it==test[i].end());
 	}
 
 	std::cout<<"------------------------------------------"<<std::endl;
-    const char testmappings[] = ";EAAC,ACAA;EACA,CAAC;EACD";
-	char* mem = allocate_mappings(sizeof(testmappings));
-	memcpy(mem, testmappings, sizeof(testmappings));
-	std::cout<<mem<<std::endl;
-	Mappings* mappings = parse_mappings(mem);
+	std::string testmappings = ";EAAC,ACAA;EACA,CAAC;EACD";
+	Mappings* mappings = parse_mappings_impl(testmappings);
 	if (last_error != Error::NoError) {
 		std::cout<< "Error "<<last_error<<std::endl;
 	}
