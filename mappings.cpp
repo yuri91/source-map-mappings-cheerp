@@ -199,6 +199,10 @@ extern "C" Mappings* parse_mappings(client::String js_input) {
 extern "C" void free_mappings(Mappings* mappings) {
 	delete mappings;
 }
+[[cheerp::jsexport]]
+extern "C" void dump(Mappings* mappings) {
+	mappings->dump();
+}
 
 int main() {
 	char testbase[] = {'A', 'Z', 'a', 'z', '0', '9', '/'};
