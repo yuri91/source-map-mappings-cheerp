@@ -38,6 +38,8 @@ struct Mapping {
 	uint32_t source{0};
 	uint32_t original_line{0};
 	uint32_t original_column{0};
+	bool has_name{false};
+	uint32_t name{0};
 	void dump(indent ind = indent(0)) const {
 		std::cout
 			<<ind<<"Mapping {" << std::endl
@@ -47,6 +49,10 @@ struct Mapping {
 			std::cout
 				<<ind.inc()<<"original_line: "<<original_line<<std::endl
 				<<ind.inc()<<"original_column: "<<original_column<<std::endl;
+		}
+		if (has_name) {
+			std::cout
+				<<ind.inc()<<"name: "<<name<<std::endl;
 		}
 		std::cout<<ind<<"}"<<std::endl;
 	}
@@ -176,6 +182,14 @@ static Mappings* parse_mappings_impl(std::string input) {
 				return nullptr;
 			}
 			m.original_column = original_column;
+			if (it != in_end && *it != ';' && *it != ',') {
+				m.has_name = true;
+				read_relative_vlq(name, it);
+				if (last_error != Error::NoError) {
+					return nullptr;
+				}
+				m.name = name;
+			}
 		}
 		by_generated.push_back(m);
 	}
