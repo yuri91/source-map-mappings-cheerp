@@ -218,7 +218,8 @@ extern "C" void dump(Mappings* mappings) {
 	mappings->dump();
 }
 
-int main() {
+[[cheerp::jsexport]]
+extern "C"  void test() {
 	char testbase[] = {'A', 'Z', 'a', 'z', '0', '9', '/'};
 
 	std::cout<<"------------------------------------------"<<std::endl;
