@@ -263,7 +263,7 @@ public:
 			return nullptr;
 		if (!it->has_original_location)
 			return nullptr;
-		// TODO bias
+		// TODO configurable bias
 		return new Mapping(&*it);
 	}
 	void destroy() {
