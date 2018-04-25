@@ -31,7 +31,7 @@ std::ostream& operator<<(std::ostream& os, const indent& ind) {
 	}
 	return os;
 }
-struct Mapping {
+struct RawMapping {
 	uint32_t generated_line{0};
 	uint32_t generated_column{0};
 	bool has_original_location{false};
@@ -56,11 +56,21 @@ struct Mapping {
 		}
 		std::cout<<ind<<"}"<<std::endl;
 	}
+	static bool comp_line_column(const RawMapping& m1, const RawMapping& m2) {
+		if(m1.generated_line < m2.generated_line)
+			return true;
+		return m1.generated_column < m2.generated_column;
+	}
+	static bool comp_column(const RawMapping& m1, const RawMapping& m2) {
+		if (m1.generated_column < m2.generated_column) {
+			return true;
+		}
+		return false;
+	}
 };
-struct Mappings {
-	std::vector<Mapping> by_generated;
+struct RawMappings {
+	std::vector<RawMapping> by_generated;
 	bool computed_column_spans{false};
-	//by_original;
 	void dump(indent ind = indent(0)) const {
 		std::cout<<ind<<"Mappings ["<<std::endl;
 		for(const auto& m: by_generated) {
@@ -69,6 +79,43 @@ struct Mappings {
 		}
 		std::cout<<ind<<"]"<<std::endl;
 	}
+};
+
+class [[cheerp::jsexport]] [[cheerp::genericjs]] Mapping {
+public:
+	uint32_t generated_line(){
+		return ptr->generated_line;
+	}
+	uint32_t generated_column(){
+		return ptr->generated_column;
+	}
+	bool has_original_location(){
+		return ptr->has_original_location;
+	}
+	uint32_t source(){
+		return ptr->source;
+	}
+	uint32_t original_line(){
+		return ptr->original_line;
+	}
+	uint32_t original_column(){
+		return ptr->original_column;
+	}
+	bool has_name(){
+		return ptr->has_name;
+	}
+	uint32_t name() {
+		return ptr->name;
+	}
+	void dump() {
+		if (ptr)
+			ptr->dump();
+		else
+			client::console.log("Invalid Mapping object");
+	}
+	Mapping(const RawMapping* ptr): ptr(ptr){}
+private:
+	const RawMapping* ptr;
 };
 
 static uint32_t base64_decode(char in) {
@@ -117,8 +164,8 @@ extern "C" int get_last_error() {
 	return last_error;
 }
 
-static Mappings* parse_mappings_impl(std::string input) {
-	std::unique_ptr<Mappings> mappings = std::make_unique<Mappings>();
+static RawMappings* parse_mappings_impl(std::string input) {
+	std::unique_ptr<RawMappings> mappings = std::make_unique<RawMappings>();
 
 	auto in_begin = input.begin();
 	uint32_t in_len = input.size();
@@ -131,15 +178,9 @@ static Mappings* parse_mappings_impl(std::string input) {
 	uint32_t name = 0;
 	uint32_t generated_line_start_index = 0;
 
-	std::vector<Mapping> by_generated;
+	std::vector<RawMapping> by_generated;
 	by_generated.reserve(in_len / 2);
 
-	auto comp = [](const Mapping& m1, const Mapping& m2) {
-		if (m1.generated_column < m2.generated_column) {
-			return true;
-		}
-		return false;
-	};
 	for (auto it = in_begin; it != in_end;) {
 		if (*it ==  ';') {
 			generated_line++;
@@ -148,7 +189,7 @@ static Mappings* parse_mappings_impl(std::string input) {
 			if (generated_line_start_index < by_generated.size()) {
 				std::sort(by_generated.begin()+generated_line_start_index,
 				          by_generated.end(),
-				          comp);
+				          RawMapping::comp_column);
 				generated_line_start_index = by_generated.size();
 			}
 			continue;
@@ -156,7 +197,7 @@ static Mappings* parse_mappings_impl(std::string input) {
 			it++;
 			continue;
 		}
-		Mapping m;
+		RawMapping m;
 		m.generated_line = generated_line;
 
 		read_relative_vlq(generated_column, it);
@@ -196,27 +237,53 @@ static Mappings* parse_mappings_impl(std::string input) {
 	if (generated_line_start_index < by_generated.size()) {
 		std::sort(by_generated.begin()+generated_line_start_index,
 		          by_generated.end(),
-		          comp);
+		          RawMapping::comp_column);
 	}
 	mappings->by_generated = std::move(by_generated);
 	return mappings.release();
 }
 
-[[cheerp::jsexport]]
-[[cheerp::genericjs]]
-extern "C" Mappings* parse_mappings(client::String js_input) {
-	std::string input(js_input);
-	return parse_mappings_impl(std::move(input));
-}
+class [[cheerp::jsexport]] [[cheerp::genericjs]] Mappings {
+public:
+	static Mappings* create(const client::String* js_input) {
+		std::string input(*js_input);
+		RawMappings* res = parse_mappings_impl(std::move(input));
+		if (res)
+			return new Mappings(res);
+		else
+			return nullptr;
+	}
+	Mapping* original_location_for(uint32_t generated_line, uint32_t generated_column) {
+		RawMapping m;
+		m.generated_line = generated_line;
+		m.generated_column = generated_column;
+		auto it = std::lower_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
+		                           m, RawMapping::comp_line_column);
+		if (it == ptr->by_generated.end())
+			return nullptr;
+		if (!it->has_original_location)
+			return nullptr;
+		// TODO bias
+		return new Mapping(&*it);
+	}
+	void destroy() {
+		if (ptr) {
+			delete ptr;
+			ptr = nullptr;
+		}
+	}
+	void dump() {
+		if (ptr)
+			ptr->dump();
+		else
+			client::console.log("Invalid Mappings object");
+	}
+	//Mappings(): ptr(nullptr) {}
+private:
+	Mappings(RawMappings* ptr): ptr(ptr) {}
+	RawMappings* ptr;
+};
 
-[[cheerp::jsexport]]
-extern "C" void free_mappings(Mappings* mappings) {
-	delete mappings;
-}
-[[cheerp::jsexport]]
-extern "C" void dump(Mappings* mappings) {
-	mappings->dump();
-}
 
 [[cheerp::jsexport]]
 extern "C"  void test() {
@@ -242,11 +309,10 @@ extern "C"  void test() {
 
 	std::cout<<"------------------------------------------"<<std::endl;
 	std::string testmappings = ";EAAC,ACAA;EACA,CAAC;EACD";
-	Mappings* mappings = parse_mappings_impl(testmappings);
+	RawMappings* mappings = parse_mappings_impl(testmappings);
 	if (last_error != Error::NoError) {
 		std::cout<< "Error "<<last_error<<std::endl;
 	}
 	mappings->dump();
-	free_mappings(mappings);
-	return 0;
+	delete mappings;
 }
