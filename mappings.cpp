@@ -3,7 +3,11 @@
 #include <memory>
 #include <cstring>
 #include <iostream>
+#include <experimental/optional>
 #include <cheerp/client.h>
+
+template<class T>
+using optional = std::experimental::optional<T>;
 
 enum Error {
 	NoError = 0,
@@ -15,6 +19,26 @@ enum Error {
 };
 
 static Error last_error = Error::NoError;
+
+template<class T, class C>
+class LazilySorted {
+	bool sorted;
+	std::vector<T> vec;
+	C cmp;
+
+public:
+	LazilySorted(): sorted(false), cmp() {}
+	const std::vector<T>& get() {
+		if(sorted)
+			return vec;
+		std::sort(vec.begin(), vec.end(), cmp);
+		return vec;
+	}
+	void push_back(T elem) {
+		sorted = false;
+		vec.push_back(elem);
+	}
+};
 
 struct indent {
 	int level{0};
@@ -40,6 +64,7 @@ struct RawMapping {
 	uint32_t original_column{0};
 	bool has_name{false};
 	uint32_t name{0};
+	optional<uint32_t> last_generated_column;
 	void dump(indent ind = indent(0)) const {
 		std::cout
 			<<ind<<"Mapping {" << std::endl
@@ -53,6 +78,10 @@ struct RawMapping {
 		if (has_name) {
 			std::cout
 				<<ind.inc()<<"name: "<<name<<std::endl;
+		}
+		if (last_generated_column) {
+			std::cout
+				<<ind.inc()<<"last_generated_column: "<<*last_generated_column<<std::endl;
 		}
 		std::cout<<ind<<"}"<<std::endl;
 	}
@@ -207,6 +236,7 @@ namespace cmp {
 struct RawMappings {
 	std::vector<RawMapping> by_generated;
 	bool computed_column_spans{false};
+	optional<std::vector<LazilySorted<RawMapping, cmp::ByOriginalLocation>>> by_original;
 	void dump(indent ind = indent(0)) const {
 		std::cout<<ind<<"Mappings ["<<std::endl;
 		for(const auto& m: by_generated) {
@@ -214,6 +244,38 @@ struct RawMappings {
 			m.dump(ind.inc());
 		}
 		std::cout<<ind<<"]"<<std::endl;
+	}
+	std::vector<LazilySorted<RawMapping, cmp::ByOriginalLocation>>& source_buckets() {
+		if (by_original) {
+			return *by_original;
+		}
+
+		compute_column_spans();
+
+		std::vector<LazilySorted<RawMapping, cmp::ByOriginalLocation>> originals;
+		for (const RawMapping& m: by_generated) {
+			if (!m.has_original_location)
+				continue;
+			while (originals.size() <= m.source) {
+				originals.push_back(LazilySorted<RawMapping, cmp::ByOriginalLocation>());
+			}
+			originals[m.source].push_back(m);
+		}
+		by_original = std::move(originals);
+		return *by_original;
+	}
+private:
+	void compute_column_spans() {
+		if (computed_column_spans)
+			return;
+		auto it = by_generated.begin();
+		while (it != by_generated.end()) {
+			RawMapping& m = *it++;
+			if (it != by_generated.end()) {
+				m.last_generated_column = it->generated_column;
+			}
+		}
+		computed_column_spans = true;
 	}
 };
 
@@ -242,6 +304,12 @@ public:
 	}
 	uint32_t name() {
 		return ptr->name;
+	}
+	bool has_last_generated_column() {
+		return bool(ptr->last_generated_column);
+	}
+	uint32_t last_generated_column() {
+		return *ptr->last_generated_column;
 	}
 	void dump() {
 		if (ptr)
@@ -401,6 +469,24 @@ public:
 		if (!it->has_original_location)
 			return nullptr;
 		// TODO configurable bias
+		return new Mapping(&*it);
+	}
+	Mapping* generated_location_for(uint32_t source, uint32_t original_line, uint32_t original_column) {
+		auto& source_buckets = ptr->source_buckets();
+		// TODO: original code is not doing exactly this
+		if (source >= source_buckets.size())
+			return nullptr;
+
+		auto& by_original = source_buckets[source].get();
+		RawMapping m;
+		m.has_original_location = true;
+		m.source = source;
+		m.original_line = original_line;
+		m.original_column = original_column;
+
+		auto it = std::lower_bound(by_original.begin(), by_original.end(), m, cmp::ByOriginalLocation());
+		if (it == by_original.end())
+			return nullptr;
 		return new Mapping(&*it);
 	}
 	void destroy() {
