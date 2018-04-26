@@ -501,7 +501,6 @@ public:
 		else
 			client::console.log("Invalid Mappings object");
 	}
-	//Mappings(): ptr(nullptr) {}
 private:
 	Mappings(RawMappings* ptr): ptr(ptr) {}
 	RawMappings* ptr;
