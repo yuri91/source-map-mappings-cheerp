@@ -56,18 +56,154 @@ struct RawMapping {
 		}
 		std::cout<<ind<<"}"<<std::endl;
 	}
-	static bool comp_line_column(const RawMapping& m1, const RawMapping& m2) {
-		if(m1.generated_line < m2.generated_line)
-			return true;
-		return m1.generated_column < m2.generated_column;
-	}
-	static bool comp_column(const RawMapping& m1, const RawMapping& m2) {
-		if (m1.generated_column < m2.generated_column) {
-			return true;
-		}
-		return false;
-	}
 };
+namespace cmp {
+	enum class Ordering {
+		Less = -1,
+		Equal = 0,
+		Greater = 1,
+	};
+	inline Ordering cmp(uint32_t u1, uint32_t u2) {
+		if (u1 < u2)
+			return Ordering::Less;
+		if (u1 > u2)
+			return Ordering::Greater;
+		return Ordering::Equal;
+	}
+	struct ByOriginalLocation {
+		bool operator()(const RawMapping& m1, const RawMapping& m2) {
+			switch (cmp(m1.source, m2.source)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.original_line, m2.original_line)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.original_column, m2.original_column)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.name, m2.name)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.generated_line, m2.generated_line)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			if (cmp(m1.generated_column, m2.generated_column) == Ordering::Less)
+				return true;
+			return false;
+		}
+	};
+	struct ByGeneratedLocation {
+		bool operator()(const RawMapping& m1, const RawMapping& m2) {
+			switch (cmp(m1.generated_line, m2.generated_line)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.generated_column, m2.generated_column)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.source, m2.source)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.original_line, m2.original_line)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.original_column, m2.original_column)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			if (cmp(m1.name, m2.name) == Ordering::Less)
+				return true;
+			return false;
+		}
+	};
+	struct ByGeneratedLocationTail {
+		bool operator()(const RawMapping& m1, const RawMapping& m2) {
+			switch (cmp(m1.generated_column, m2.generated_column)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.source, m2.source)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.original_line, m2.original_line)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (cmp(m1.original_column, m2.original_column)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			if (cmp(m1.name, m2.name) == Ordering::Less)
+				return true;
+			return false;
+		}
+	};
+}
 struct RawMappings {
 	std::vector<RawMapping> by_generated;
 	bool computed_column_spans{false};
@@ -181,6 +317,7 @@ static RawMappings* parse_mappings_impl(std::string input) {
 	std::vector<RawMapping> by_generated;
 	by_generated.reserve(in_len / 2);
 
+	cmp::ByGeneratedLocationTail comparator;
 	for (auto it = in_begin; it != in_end;) {
 		if (*it ==  ';') {
 			generated_line++;
@@ -189,7 +326,7 @@ static RawMappings* parse_mappings_impl(std::string input) {
 			if (generated_line_start_index < by_generated.size()) {
 				std::sort(by_generated.begin()+generated_line_start_index,
 				          by_generated.end(),
-				          RawMapping::comp_column);
+				          comparator);
 				generated_line_start_index = by_generated.size();
 			}
 			continue;
@@ -237,7 +374,7 @@ static RawMappings* parse_mappings_impl(std::string input) {
 	if (generated_line_start_index < by_generated.size()) {
 		std::sort(by_generated.begin()+generated_line_start_index,
 		          by_generated.end(),
-		          RawMapping::comp_column);
+		          comparator);
 	}
 	mappings->by_generated = std::move(by_generated);
 	return mappings.release();
@@ -258,7 +395,7 @@ public:
 		m.generated_line = generated_line;
 		m.generated_column = generated_column;
 		auto it = std::lower_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
-		                           m, RawMapping::comp_line_column);
+		                           m, cmp::ByGeneratedLocation());
 		if (it == ptr->by_generated.end())
 			return nullptr;
 		if (!it->has_original_location)
