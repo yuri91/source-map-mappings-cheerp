@@ -368,7 +368,7 @@ static RawMappings* parse_mappings_impl(std::string input) {
 	auto in_begin = input.begin();
 	uint32_t in_len = input.size();
 	auto in_end = input.end();
-	uint32_t generated_line = 0;
+	uint32_t generated_line = 1;
 	uint32_t generated_column = 0;
 	uint32_t original_line = 0;
 	uint32_t original_column = 0;
@@ -416,7 +416,7 @@ static RawMappings* parse_mappings_impl(std::string input) {
 			if (last_error != Error::NoError) {
 				return nullptr;
 			}
-			o.line = original_line;
+			o.line = original_line+1;
 			read_relative_vlq(original_column, it);
 			if (last_error != Error::NoError) {
 				return nullptr;
