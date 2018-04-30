@@ -20,6 +20,11 @@ enum Error {
 
 static Error last_error = Error::NoError;
 
+enum class Bias {
+	GreatestLowerBound = 1,
+	LeastUpperBound = 2,
+};
+
 template<class T, class C>
 class LazilySorted {
 	bool sorted;
@@ -447,20 +452,34 @@ public:
 		else
 			return nullptr;
 	}
-	Mapping* original_location_for(uint32_t generated_line, uint32_t generated_column) {
+	Mapping* original_location_for(uint32_t generated_line,
+	                               uint32_t generated_column,
+	                               Bias bias) {
 		RawMapping m;
 		m.generated_line = generated_line;
 		m.generated_column = generated_column;
-		auto it = std::lower_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
-		                           m, cmp::ByGeneratedLocation());
-		if (it == ptr->by_generated.end())
+		RawMapping* ret = nullptr;
+		if (bias == Bias::GreatestLowerBound) {
+			auto it = std::upper_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
+							   m, cmp::ByGeneratedLocation());
+			if (it == ptr->by_generated.begin())
+				return nullptr;
+			ret = &*(it-1);
+		} else {
+			auto it = std::lower_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
+							   m, cmp::ByGeneratedLocation());
+			if (it == ptr->by_generated.end())
+				return nullptr;
+			ret = &*it;
+		}
+		if (!ret->original)
 			return nullptr;
-		if (!it->original)
-			return nullptr;
-		// TODO configurable bias
-		return new Mapping(&*it);
+		return new Mapping(ret);
 	}
-	Mapping* generated_location_for(uint32_t source, uint32_t original_line, uint32_t original_column) {
+	Mapping* generated_location_for(uint32_t source,
+	                                uint32_t original_line,
+	                                uint32_t original_column,
+	                                Bias bias) {
 		auto& source_buckets = ptr->source_buckets();
 		// TODO: original code is not doing exactly this
 		if (source >= source_buckets.size())
@@ -474,10 +493,23 @@ public:
 		o.column = original_column;
 		m.original = o;
 
-		auto it = std::lower_bound(by_original.begin(), by_original.end(), m, cmp::ByOriginalLocation());
-		if (it == by_original.end())
-			return nullptr;
-		return new Mapping(&*it);
+		const RawMapping* ret = nullptr;
+		if (bias == Bias::GreatestLowerBound) {
+			auto it = std::upper_bound(by_original.begin(),
+			                           by_original.end(),
+			                           m, cmp::ByOriginalLocationOnly());
+			if (it == by_original.begin())
+				return nullptr;
+			ret = &*(it-1);
+		} else {
+			auto it = std::lower_bound(by_original.begin(),
+			                           by_original.end(),
+			                           m, cmp::ByOriginalLocationOnly());
+			if (it == by_original.end())
+				return nullptr;
+			ret = &*it;
+		}
+		return new Mapping(ret);
 	}
 	void destroy() {
 		if (ptr) {
