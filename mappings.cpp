@@ -55,29 +55,30 @@ std::ostream& operator<<(std::ostream& os, const indent& ind) {
 	}
 	return os;
 }
+struct OriginalLocation {
+	uint32_t source{0};
+	uint32_t line{0};
+	uint32_t column{0};
+	optional<uint32_t> name;
+};
 struct RawMapping {
 	uint32_t generated_line{0};
 	uint32_t generated_column{0};
-	bool has_original_location{false};
-	uint32_t source{0};
-	uint32_t original_line{0};
-	uint32_t original_column{0};
-	bool has_name{false};
-	uint32_t name{0};
+	optional<OriginalLocation> original;
 	optional<uint32_t> last_generated_column;
 	void dump(indent ind = indent(0)) const {
 		std::cout
 			<<ind<<"Mapping {" << std::endl
 			<<ind.inc()<<"generated_line: "<<generated_line<<std::endl
 			<<ind.inc()<<"generated_column: "<<generated_column<<std::endl;
-		if (has_original_location) {
+		if (original) {
 			std::cout
-				<<ind.inc()<<"original_line: "<<original_line<<std::endl
-				<<ind.inc()<<"original_column: "<<original_column<<std::endl;
-		}
-		if (has_name) {
-			std::cout
-				<<ind.inc()<<"name: "<<name<<std::endl;
+				<<ind.inc()<<"original_line: "<<original->line<<std::endl
+				<<ind.inc()<<"original_column: "<<original->column<<std::endl;
+			if (original->name) {
+				std::cout
+					<<ind.inc()<<"name: "<<*original->name<<std::endl;
+			}
 		}
 		if (last_generated_column) {
 			std::cout
@@ -92,16 +93,66 @@ namespace cmp {
 		Equal = 0,
 		Greater = 1,
 	};
-	inline Ordering cmp(uint32_t u1, uint32_t u2) {
-		if (u1 < u2)
-			return Ordering::Less;
-		if (u1 > u2)
+	template<class T>
+	struct Orderer {
+		inline Ordering operator()(const T& u1, const T& u2) {
+			if (u1 < u2)
+				return Ordering::Less;
+			if (u1 > u2)
+				return Ordering::Greater;
+			return Ordering::Equal;
+		}
+	};
+	template<class T>
+	struct Orderer<optional<T>> {
+		inline Ordering operator()(const optional<T>& u1, const optional<T>& u2) {
+			Orderer<T> ord;
+			if (bool(u1) && bool(u2))
+				return ord(*u1, *u2);
+			if (!bool(u1) && !bool(u2))
+				return Ordering::Equal;
+			if (!bool(u1))
+				return Ordering::Less;
 			return Ordering::Greater;
-		return Ordering::Equal;
-	}
+		}
+	};
+	template<>
+	struct Orderer<OriginalLocation> {
+		inline Ordering operator()(const OriginalLocation& o1, const OriginalLocation& o2) {
+			Orderer<optional<uint32_t>> opt_ord;
+			Orderer<uint32_t> ord;
+			switch (ord(o1.source, o2.source)) {
+			case Ordering::Less:
+				return Ordering::Less;
+			case Ordering::Greater:
+				return Ordering::Greater;
+			default:
+				break;
+			}
+			switch (ord(o1.line, o2.line)) {
+			case Ordering::Less:
+				return Ordering::Less;
+			case Ordering::Greater:
+				return Ordering::Greater;
+			default:
+				break;
+			}
+			switch (ord(o1.column, o2.column)) {
+			case Ordering::Less:
+				return Ordering::Less;
+			case Ordering::Greater:
+				return Ordering::Greater;
+			default:
+				break;
+			}
+			return opt_ord(o1.name, o2.name);
+		}
+	};
 	struct ByOriginalLocation {
 		bool operator()(const RawMapping& m1, const RawMapping& m2) {
-			switch (cmp(m1.source, m2.source)) {
+			Orderer<optional<OriginalLocation>> ord_orig;
+			Orderer<uint32_t> ord;
+			switch (ord_orig(m1.original, m2.original)) {
 			case Ordering::Less:
 				return true;
 			case Ordering::Greater:
@@ -109,7 +160,7 @@ namespace cmp {
 			default:
 				break;
 			}
-			switch (cmp(m1.original_line, m2.original_line)) {
+			switch (ord(m1.generated_line, m2.generated_line)) {
 			case Ordering::Less:
 				return true;
 			case Ordering::Greater:
@@ -117,38 +168,16 @@ namespace cmp {
 			default:
 				break;
 			}
-			switch (cmp(m1.original_column, m2.original_column)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
-				return false;
-			default:
-				break;
-			}
-			switch (cmp(m1.name, m2.name)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
-				return false;
-			default:
-				break;
-			}
-			switch (cmp(m1.generated_line, m2.generated_line)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
-				return false;
-			default:
-				break;
-			}
-			if (cmp(m1.generated_column, m2.generated_column) == Ordering::Less)
+			if (ord(m1.generated_column, m2.generated_column) == Ordering::Less)
 				return true;
 			return false;
 		}
 	};
 	struct ByGeneratedLocation {
 		bool operator()(const RawMapping& m1, const RawMapping& m2) {
-			switch (cmp(m1.generated_line, m2.generated_line)) {
+			Orderer<optional<OriginalLocation>> ord_orig;
+			Orderer<uint32_t> ord;
+			switch (ord(m1.generated_line, m2.generated_line)) {
 			case Ordering::Less:
 				return true;
 			case Ordering::Greater:
@@ -156,7 +185,7 @@ namespace cmp {
 			default:
 				break;
 			}
-			switch (cmp(m1.generated_column, m2.generated_column)) {
+			switch (ord(m1.generated_column, m2.generated_column)) {
 			case Ordering::Less:
 				return true;
 			case Ordering::Greater:
@@ -164,38 +193,19 @@ namespace cmp {
 			default:
 				break;
 			}
-			switch (cmp(m1.source, m2.source)) {
+			switch (ord_orig(m1.original, m2.original)) {
 			case Ordering::Less:
 				return true;
-			case Ordering::Greater:
-				return false;
 			default:
-				break;
-			}
-			switch (cmp(m1.original_line, m2.original_line)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
 				return false;
-			default:
-				break;
 			}
-			switch (cmp(m1.original_column, m2.original_column)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
-				return false;
-			default:
-				break;
-			}
-			if (cmp(m1.name, m2.name) == Ordering::Less)
-				return true;
-			return false;
 		}
 	};
 	struct ByGeneratedLocationTail {
 		bool operator()(const RawMapping& m1, const RawMapping& m2) {
-			switch (cmp(m1.generated_column, m2.generated_column)) {
+			Orderer<optional<OriginalLocation>> ord_orig;
+			Orderer<uint32_t> ord;
+			switch (ord(m1.generated_column, m2.generated_column)) {
 			case Ordering::Less:
 				return true;
 			case Ordering::Greater:
@@ -203,33 +213,12 @@ namespace cmp {
 			default:
 				break;
 			}
-			switch (cmp(m1.source, m2.source)) {
+			switch (ord_orig(m1.original, m2.original)) {
 			case Ordering::Less:
 				return true;
-			case Ordering::Greater:
-				return false;
 			default:
-				break;
-			}
-			switch (cmp(m1.original_line, m2.original_line)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
 				return false;
-			default:
-				break;
 			}
-			switch (cmp(m1.original_column, m2.original_column)) {
-			case Ordering::Less:
-				return true;
-			case Ordering::Greater:
-				return false;
-			default:
-				break;
-			}
-			if (cmp(m1.name, m2.name) == Ordering::Less)
-				return true;
-			return false;
 		}
 	};
 }
@@ -254,12 +243,12 @@ struct RawMappings {
 
 		std::vector<LazilySorted<RawMapping, cmp::ByOriginalLocation>> originals;
 		for (const RawMapping& m: by_generated) {
-			if (!m.has_original_location)
+			if (!m.original)
 				continue;
-			while (originals.size() <= m.source) {
+			while (originals.size() <= m.original->source) {
 				originals.push_back(LazilySorted<RawMapping, cmp::ByOriginalLocation>());
 			}
-			originals[m.source].push_back(m);
+			originals[m.original->source].push_back(m);
 		}
 		by_original = std::move(originals);
 		return *by_original;
@@ -288,22 +277,22 @@ public:
 		return ptr->generated_column;
 	}
 	bool has_original_location(){
-		return ptr->has_original_location;
+		return bool(ptr->original);
 	}
 	uint32_t source(){
-		return ptr->source;
+		return ptr->original->source;
 	}
 	uint32_t original_line(){
-		return ptr->original_line;
+		return ptr->original->line;
 	}
 	uint32_t original_column(){
-		return ptr->original_column;
+		return ptr->original->column;
 	}
 	bool has_name(){
-		return ptr->has_name;
+		return bool(ptr->original) && bool(ptr->original->name);
 	}
 	uint32_t name() {
-		return ptr->name;
+		return *ptr->original->name;
 	}
 	bool has_last_generated_column() {
 		return bool(ptr->last_generated_column);
@@ -412,30 +401,30 @@ static RawMappings* parse_mappings_impl(std::string input) {
 		m.generated_column = generated_column;
 
 		if (it != in_end && *it != ';' && *it != ',') {
-			m.has_original_location = true;
+			OriginalLocation o;
 			read_relative_vlq(source, it);
 			if (last_error != Error::NoError) {
 				return nullptr;
 			}
-			m.source = source;
+			o.source = source;
 			read_relative_vlq(original_line, it);
 			if (last_error != Error::NoError) {
 				return nullptr;
 			}
-			m.original_line = original_line;
+			o.line = original_line;
 			read_relative_vlq(original_column, it);
 			if (last_error != Error::NoError) {
 				return nullptr;
 			}
-			m.original_column = original_column;
+			o.column = original_column;
 			if (it != in_end && *it != ';' && *it != ',') {
-				m.has_name = true;
 				read_relative_vlq(name, it);
 				if (last_error != Error::NoError) {
 					return nullptr;
 				}
-				m.name = name;
+				o.name = name;
 			}
+			m.original = o;
 		}
 		by_generated.push_back(m);
 	}
@@ -466,7 +455,7 @@ public:
 		                           m, cmp::ByGeneratedLocation());
 		if (it == ptr->by_generated.end())
 			return nullptr;
-		if (!it->has_original_location)
+		if (!it->original)
 			return nullptr;
 		// TODO configurable bias
 		return new Mapping(&*it);
@@ -479,10 +468,11 @@ public:
 
 		auto& by_original = source_buckets[source].get();
 		RawMapping m;
-		m.has_original_location = true;
-		m.source = source;
-		m.original_line = original_line;
-		m.original_column = original_column;
+		OriginalLocation o;
+		o.source = source;
+		o.line = original_line;
+		o.column = original_column;
+		m.original = o;
 
 		auto it = std::lower_bound(by_original.begin(), by_original.end(), m, cmp::ByOriginalLocation());
 		if (it == by_original.end())
