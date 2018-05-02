@@ -153,6 +153,21 @@ namespace cmp {
 			return opt_ord(o1.name, o2.name);
 		}
 	};
+	struct ByOriginalLocationOnly {
+		bool operator()(const RawMapping& m1, const RawMapping& m2) {
+			Orderer<optional<OriginalLocation>> ord_orig;
+			Orderer<uint32_t> ord;
+			switch (ord_orig(m1.original, m2.original)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			return false;
+		}
+	};
 	struct ByOriginalLocation {
 		bool operator()(const RawMapping& m1, const RawMapping& m2) {
 			Orderer<optional<OriginalLocation>> ord_orig;
@@ -175,6 +190,28 @@ namespace cmp {
 			}
 			if (ord(m1.generated_column, m2.generated_column) == Ordering::Less)
 				return true;
+			return false;
+		}
+	};
+	struct ByGeneratedLocationOnly {
+		bool operator()(const RawMapping& m1, const RawMapping& m2) {
+			Orderer<uint32_t> ord;
+			switch (ord(m1.generated_line, m2.generated_line)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
+			switch (ord(m1.generated_column, m2.generated_column)) {
+			case Ordering::Less:
+				return true;
+			case Ordering::Greater:
+				return false;
+			default:
+				break;
+			}
 			return false;
 		}
 	};
@@ -460,14 +497,16 @@ public:
 		m.generated_column = generated_column;
 		RawMapping* ret = nullptr;
 		if (bias == Bias::GreatestLowerBound) {
-			auto it = std::upper_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
-							   m, cmp::ByGeneratedLocation());
+			auto it = std::upper_bound(ptr->by_generated.begin(),
+			                           ptr->by_generated.end(),
+			                           m, cmp::ByGeneratedLocationOnly());
 			if (it == ptr->by_generated.begin())
 				return nullptr;
 			ret = &*(it-1);
 		} else {
-			auto it = std::lower_bound(ptr->by_generated.begin(), ptr->by_generated.end(),
-							   m, cmp::ByGeneratedLocation());
+			auto it = std::lower_bound(ptr->by_generated.begin(),
+			                           ptr->by_generated.end(),
+			                           m, cmp::ByGeneratedLocationOnly());
 			if (it == ptr->by_generated.end())
 				return nullptr;
 			ret = &*it;
