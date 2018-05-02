@@ -295,7 +295,6 @@ struct RawMappings {
 		by_original = std::move(originals);
 		return *by_original;
 	}
-private:
 	void compute_column_spans() {
 		if (computed_column_spans)
 			return;
@@ -503,6 +502,9 @@ public:
 			return new Mappings(res);
 		else
 			return nullptr;
+	}
+	void compute_column_spans() {
+		ptr->compute_column_spans();
 	}
 	Mapping* original_location_for(uint32_t generated_line,
 	                               uint32_t generated_column,
