@@ -479,6 +479,21 @@ static RawMappings* parse_mappings_impl(std::string input) {
 	return mappings.release();
 }
 
+class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsIterator {
+	RawMapping* it;
+	RawMapping* end;
+public:
+	MappingsIterator(RawMapping* begin, RawMapping* end): it(begin), end(end) {}
+	Mapping* next() {
+		if (it != end) {
+			Mapping* ret = new Mapping(it);
+			it++;
+			return ret;
+		}
+		return nullptr;
+	}
+};
+
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mappings {
 public:
 	static Mappings* create(const client::String* js_input) {
@@ -549,6 +564,9 @@ public:
 			ret = &*it;
 		}
 		return new Mapping(ret);
+	}
+	MappingsIterator* by_generated_location() {
+		return new MappingsIterator(&*ptr->by_generated.begin(), &*ptr->by_generated.end());
 	}
 	void destroy() {
 		if (ptr) {
