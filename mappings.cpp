@@ -124,7 +124,6 @@ namespace cmp {
 	template<>
 	struct Orderer<OriginalLocation> {
 		inline Ordering operator()(const OriginalLocation& o1, const OriginalLocation& o2) {
-			Orderer<optional<uint32_t>> opt_ord;
 			Orderer<uint32_t> ord;
 			switch (ord(o1.source, o2.source)) {
 			case Ordering::Less:
@@ -150,7 +149,8 @@ namespace cmp {
 			default:
 				break;
 			}
-			return opt_ord(o1.name, o2.name);
+			// We never compare names
+			return Ordering::Equal;
 		}
 	};
 	struct ByOriginalLocationOnly {
