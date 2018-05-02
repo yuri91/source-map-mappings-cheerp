@@ -479,10 +479,11 @@ static RawMappings* parse_mappings_impl(std::string input) {
 }
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsIterator {
-	RawMapping* it;
-	RawMapping* end;
+	const RawMapping* it;
+	const RawMapping* end;
 public:
-	MappingsIterator(RawMapping* begin, RawMapping* end): it(begin), end(end) {}
+	MappingsIterator(const RawMapping* begin, const RawMapping* end)
+		: it(begin), end(end) {}
 	Mapping* next() {
 		if (it != end) {
 			Mapping* ret = new Mapping(it);
