@@ -404,6 +404,7 @@ extern "C" int get_last_error() {
 }
 
 static RawMappings* parse_mappings_impl(std::string input) {
+	last_error = Error::NoError;
 	std::unique_ptr<RawMappings> mappings = std::make_unique<RawMappings>();
 
 	auto in_begin = input.begin();
