@@ -352,7 +352,7 @@ private:
 	const RawMapping* ptr;
 };
 
-static uint32_t base64_decode(char in) {
+static int32_t base64_decode(char in) {
 	// TODO error handling
 	if (in == '+') {
 		return 62;
@@ -362,8 +362,10 @@ static uint32_t base64_decode(char in) {
 		return in - 'A';
 	} else if (in >= 'a' && in <= 'z') {
 		return in - 'a' + ('z' - 'a') + 1;
-	} else {
+	} else if (in >= '0' && in <= '9'){
 		return in - '0' + ('Z' - 'A') + ('z' - 'a') + 2;
+	} else {
+		return -1;
 	}
 }
 static int64_t vlq_decode(std::string::iterator& it) {
@@ -371,7 +373,11 @@ static int64_t vlq_decode(std::string::iterator& it) {
 	uint32_t shift = 0;
 	bool hasContinuationBit = false;
 	do {
-		uint32_t i = base64_decode(*it);
+		int32_t i = base64_decode(*it);
+		if (i<0) {
+			last_error = Error::VlqInvalidBase64;
+			return 0;
+		}
 		hasContinuationBit = i & 32;
 		i &= 31;
 		r += i << shift;
@@ -384,7 +390,6 @@ static int64_t vlq_decode(std::string::iterator& it) {
 }
 static void read_relative_vlq(uint32_t& prev, std::string::iterator& it) {
 	int64_t decoded = vlq_decode(it);
-	// TODO check error
 	int64_t v = decoded + prev;
 	// TODO check too big
 	if (v < 0)
