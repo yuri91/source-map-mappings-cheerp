@@ -301,7 +301,7 @@ struct RawMappings {
 		auto it = by_generated.begin();
 		while (it != by_generated.end()) {
 			RawMapping& m = *it++;
-			if (it != by_generated.end()) {
+			if (it != by_generated.end() && it->generated_line == m.generated_line) {
 				m.last_generated_column = it->generated_column;
 			}
 		}
