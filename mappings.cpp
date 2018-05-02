@@ -497,22 +497,28 @@ public:
 class [[cheerp::jsexport]] [[cheerp::genericjs]] AllGeneratedLocationsFor {
 	MappingsIterator* it;
 	uint32_t line;
+	bool has_column;
 	uint32_t column;
 public:
 	AllGeneratedLocationsFor(MappingsIterator* it,
 	                         uint32_t original_line,
+	                         bool has_original_column,
 	                         uint32_t original_column)
 		:it(it)
 		,line(original_line)
+		,has_column(has_original_column)
 		,column(original_column) {}
-	MappingsIterator* iter() {
-		return it;
-	}
-	uint32_t original_line() {
-		return line;
-	}
-	uint32_t original_column() {
-		return column;
+	Mapping* next() {
+		if (Mapping* m = it->next()) {
+			if (m->original_line() != line) {
+				return nullptr;
+			}
+			if (has_column && m->original_column() != column)  {
+				return nullptr;
+			}
+			return &*m;
+		}
+		return nullptr;
 	}
 };
 
@@ -608,17 +614,18 @@ public:
 		o.column = original_column;
 		m.original = o;
 
-		auto range = std::equal_range(by_original.begin(),
+		auto lower = std::lower_bound(by_original.begin(),
 		                              by_original.end(),
 		                              m, cmp::ByOriginalLocationOnly());
-		if (range.first == range.second)
-			return nullptr;
-		MappingsIterator* iter = new MappingsIterator(&*range.first, &*range.second);
+		MappingsIterator* iter = new MappingsIterator(&*lower, &*by_original.end());
 		if (!has_original_column)
-			original_line = range.first->original->line;
-		original_column = range.first->original->column;
+			original_line = lower->original->line;
+		original_column = lower->original->column;
 
-		return new AllGeneratedLocationsFor(iter, original_line, original_column);
+		return new AllGeneratedLocationsFor(iter,
+		                                    original_line,
+		                                    has_original_column,
+		                                    original_column);
 	}
 	MappingsIterator* by_generated_location() {
 		return new MappingsIterator(&*ptr->by_generated.begin(), &*ptr->by_generated.end());
