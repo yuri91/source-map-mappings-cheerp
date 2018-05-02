@@ -494,6 +494,28 @@ public:
 	}
 };
 
+class [[cheerp::jsexport]] [[cheerp::genericjs]] AllGeneratedLocationsFor {
+	MappingsIterator* it;
+	uint32_t line;
+	uint32_t column;
+public:
+	AllGeneratedLocationsFor(MappingsIterator* it,
+	                         uint32_t original_line,
+	                         uint32_t original_column)
+		:it(it)
+		,line(original_line)
+		,column(original_column) {}
+	MappingsIterator* iter() {
+		return it;
+	}
+	uint32_t original_line() {
+		return line;
+	}
+	uint32_t original_column() {
+		return column;
+	}
+};
+
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mappings {
 public:
 	static Mappings* create(const client::String* js_input) {
@@ -567,6 +589,36 @@ public:
 			ret = &*it;
 		}
 		return new Mapping(ret);
+	}
+	AllGeneratedLocationsFor*
+	all_generated_locations_for(uint32_t source,
+	                            uint32_t original_line,
+	                            bool has_original_column,
+	                            uint32_t original_column) {
+		auto& source_buckets = ptr->source_buckets();
+		// TODO: original code is not doing exactly this
+		if (source >= source_buckets.size())
+			return nullptr;
+
+		auto& by_original = source_buckets[source].get();
+		RawMapping m;
+		OriginalLocation o;
+		o.source = source;
+		o.line = original_line;
+		o.column = original_column;
+		m.original = o;
+
+		auto range = std::equal_range(by_original.begin(),
+		                              by_original.end(),
+		                              m, cmp::ByOriginalLocationOnly());
+		if (range.first == range.second)
+			return nullptr;
+		MappingsIterator* iter = new MappingsIterator(&*range.first, &*range.second);
+		if (!has_original_column)
+			original_line = range.first->original->line;
+		original_column = range.first->original->column;
+
+		return new AllGeneratedLocationsFor(iter, original_line, original_column);
 	}
 	MappingsIterator* by_generated_location() {
 		return new MappingsIterator(&*ptr->by_generated.begin(), &*ptr->by_generated.end());
