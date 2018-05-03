@@ -8,7 +8,7 @@ PROJECT (MAPPINGS)
 #INCLUDE_DIRECTORIES(
 #)
 
-ADD_EXECUTABLE(mappings mappings.cpp)
+ADD_EXECUTABLE(mappings mappings.cpp raw_mappings.cpp utils.cpp)
 
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -cheerp-mode=wasm -std=c++14")
