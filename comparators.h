@@ -13,7 +13,7 @@ enum class Ordering {
 };
 template<class T>
 struct Orderer {
-	inline Ordering operator()(const T& u1, const T& u2) const {
+	Ordering operator()(const T& u1, const T& u2) const {
 		if (u1 < u2)
 			return Ordering::Less;
 		if (u1 > u2)
@@ -23,7 +23,7 @@ struct Orderer {
 };
 template<class T>
 struct Orderer<optional<T>> {
-	inline Ordering operator()(
+	Ordering operator()(
 		const optional<T>& u1,
 		const optional<T>& u2
 	) const {
@@ -39,7 +39,7 @@ struct Orderer<optional<T>> {
 };
 template<>
 struct Orderer<OriginalLocation> {
-	inline Ordering operator()(
+	Ordering operator()(
 		const OriginalLocation& o1,
 		const OriginalLocation& o2
 	) const {
@@ -73,7 +73,7 @@ struct Orderer<OriginalLocation> {
 	}
 };
 struct ByOriginalLocationOnly {
-	inline bool operator()(const RawMapping& m1, const RawMapping& m2) const {
+	bool operator()(const RawMapping& m1, const RawMapping& m2) const {
 		Orderer<optional<OriginalLocation>> ord_orig;
 		Orderer<uint32_t> ord;
 		switch (ord_orig(m1.original, m2.original)) {
@@ -88,7 +88,7 @@ struct ByOriginalLocationOnly {
 	}
 };
 struct ByOriginalLocation {
-	inline bool operator()(const RawMapping& m1, const RawMapping& m2) const {
+	bool operator()(const RawMapping& m1, const RawMapping& m2) const {
 		Orderer<optional<OriginalLocation>> ord_orig;
 		Orderer<uint32_t> ord;
 		switch (ord_orig(m1.original, m2.original)) {
@@ -113,7 +113,7 @@ struct ByOriginalLocation {
 	}
 };
 struct ByGeneratedLocationOnly {
-	inline bool operator()(const RawMapping& m1, const RawMapping& m2) const {
+	bool operator()(const RawMapping& m1, const RawMapping& m2) const {
 		Orderer<uint32_t> ord;
 		switch (ord(m1.generated_line, m2.generated_line)) {
 		case Ordering::Less:
@@ -135,7 +135,7 @@ struct ByGeneratedLocationOnly {
 	}
 };
 struct ByGeneratedLocation {
-	inline bool operator()(const RawMapping& m1, const RawMapping& m2) const {
+	bool operator()(const RawMapping& m1, const RawMapping& m2) const {
 		Orderer<optional<OriginalLocation>> ord_orig;
 		Orderer<uint32_t> ord;
 		switch (ord(m1.generated_line, m2.generated_line)) {
@@ -163,7 +163,7 @@ struct ByGeneratedLocation {
 	}
 };
 struct ByGeneratedLocationTail {
-	inline bool operator()(const RawMapping& m1, const RawMapping& m2) const {
+	bool operator()(const RawMapping& m1, const RawMapping& m2) const {
 		Orderer<optional<OriginalLocation>> ord_orig;
 		Orderer<uint32_t> ord;
 		switch (ord(m1.generated_column, m2.generated_column)) {
