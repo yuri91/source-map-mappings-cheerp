@@ -317,6 +317,67 @@ struct RawMappings {
 		}
 		computed_column_spans = true;
 	}
+	const RawMapping* original_location_for(uint32_t generated_line,
+	                                        uint32_t generated_column,
+	                                        Bias bias) {
+		RawMapping m;
+		m.generated_line = generated_line;
+		m.generated_column = generated_column;
+		RawMapping* ret = nullptr;
+		if (bias == Bias::GreatestLowerBound) {
+			auto it = std::upper_bound(by_generated.begin(),
+			                           by_generated.end(),
+			                           m, cmp::ByGeneratedLocationOnly());
+			if (it == by_generated.begin())
+				return nullptr;
+			ret = &*(it-1);
+		} else {
+			auto it = std::lower_bound(by_generated.begin(),
+			                           by_generated.end(),
+			                           m, cmp::ByGeneratedLocationOnly());
+			if (it == by_generated.end())
+				return nullptr;
+			ret = &*it;
+		}
+		if (!ret->original)
+			return nullptr;
+		return ret;
+	}
+	const RawMapping* generated_location_for(uint32_t source,
+	                                         uint32_t original_line,
+	                                         uint32_t original_column,
+	                                         Bias bias) {
+		auto& buckets = source_buckets();
+		// TODO: original code is not doing exactly this
+		if (source >= buckets.size())
+			return nullptr;
+
+		auto& by_original = buckets[source].get();
+		RawMapping m;
+		OriginalLocation o;
+		o.source = source;
+		o.line = original_line;
+		o.column = original_column;
+		m.original = o;
+
+		const RawMapping* ret = nullptr;
+		if (bias == Bias::GreatestLowerBound) {
+			auto it = std::upper_bound(by_original.begin(),
+			                           by_original.end(),
+			                           m, cmp::ByOriginalLocationOnly());
+			if (it == by_original.begin())
+				return nullptr;
+			ret = &*(it-1);
+		} else {
+			auto it = std::lower_bound(by_original.begin(),
+			                           by_original.end(),
+			                           m, cmp::ByOriginalLocationOnly());
+			if (it == by_original.end())
+				return nullptr;
+			ret = &*it;
+		}
+		return ret;
+	}
 };
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mapping {
@@ -556,26 +617,8 @@ public:
 	Mapping* original_location_for(uint32_t generated_line,
 	                               uint32_t generated_column,
 	                               Bias bias) {
-		RawMapping m;
-		m.generated_line = generated_line;
-		m.generated_column = generated_column;
-		RawMapping* ret = nullptr;
-		if (bias == Bias::GreatestLowerBound) {
-			auto it = std::upper_bound(ptr->by_generated.begin(),
-			                           ptr->by_generated.end(),
-			                           m, cmp::ByGeneratedLocationOnly());
-			if (it == ptr->by_generated.begin())
-				return nullptr;
-			ret = &*(it-1);
-		} else {
-			auto it = std::lower_bound(ptr->by_generated.begin(),
-			                           ptr->by_generated.end(),
-			                           m, cmp::ByGeneratedLocationOnly());
-			if (it == ptr->by_generated.end())
-				return nullptr;
-			ret = &*it;
-		}
-		if (!ret->original)
+		const RawMapping* ret = ptr->original_location_for(generated_line, generated_column, bias);
+		if (ret==nullptr)
 			return nullptr;
 		return new Mapping(ret);
 	}
@@ -583,35 +626,9 @@ public:
 	                                uint32_t original_line,
 	                                uint32_t original_column,
 	                                Bias bias) {
-		auto& source_buckets = ptr->source_buckets();
-		// TODO: original code is not doing exactly this
-		if (source >= source_buckets.size())
+		const RawMapping* ret = ptr->generated_location_for(source, original_line, original_column, bias);
+		if (ret == nullptr)
 			return nullptr;
-
-		auto& by_original = source_buckets[source].get();
-		RawMapping m;
-		OriginalLocation o;
-		o.source = source;
-		o.line = original_line;
-		o.column = original_column;
-		m.original = o;
-
-		const RawMapping* ret = nullptr;
-		if (bias == Bias::GreatestLowerBound) {
-			auto it = std::upper_bound(by_original.begin(),
-			                           by_original.end(),
-			                           m, cmp::ByOriginalLocationOnly());
-			if (it == by_original.begin())
-				return nullptr;
-			ret = &*(it-1);
-		} else {
-			auto it = std::lower_bound(by_original.begin(),
-			                           by_original.end(),
-			                           m, cmp::ByOriginalLocationOnly());
-			if (it == by_original.end())
-				return nullptr;
-			ret = &*it;
-		}
 		return new Mapping(ret);
 	}
 	AllGeneratedLocationsFor*
