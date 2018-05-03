@@ -2,9 +2,12 @@
 #include <algorithm>
 #include <memory>
 #include <cstring>
-#include <iostream>
 #include <experimental/optional>
 #include <cheerp/client.h>
+
+#ifdef DEBUG
+#include <iostream>
+#endif
 
 template<class T>
 using optional = std::experimental::optional<T>;
@@ -45,6 +48,7 @@ public:
 	}
 };
 
+#ifdef DEBUG
 struct indent {
 	int level{0};
 	indent(int level): level(level){}
@@ -60,6 +64,8 @@ std::ostream& operator<<(std::ostream& os, const indent& ind) {
 	}
 	return os;
 }
+#endif
+
 struct OriginalLocation {
 	uint32_t source{0};
 	uint32_t line{0};
@@ -71,6 +77,7 @@ struct RawMapping {
 	uint32_t generated_column{0};
 	optional<OriginalLocation> original;
 	optional<uint32_t> last_generated_column;
+#ifdef DEBUG
 	void dump(indent ind = indent(0)) const {
 		std::cout
 			<<ind<<"Mapping {" << std::endl
@@ -91,6 +98,7 @@ struct RawMapping {
 		}
 		std::cout<<ind<<"}"<<std::endl;
 	}
+#endif
 };
 namespace cmp {
 	enum class Ordering {
@@ -268,6 +276,7 @@ struct RawMappings {
 	std::vector<RawMapping> by_generated;
 	bool computed_column_spans{false};
 	optional<std::vector<LazilySorted<RawMapping, cmp::ByOriginalLocation>>> by_original;
+#ifdef DEBUG
 	void dump(indent ind = indent(0)) const {
 		std::cout<<ind<<"Mappings ["<<std::endl;
 		for(const auto& m: by_generated) {
@@ -276,6 +285,7 @@ struct RawMappings {
 		}
 		std::cout<<ind<<"]"<<std::endl;
 	}
+#endif
 	std::vector<LazilySorted<RawMapping, cmp::ByOriginalLocation>>& source_buckets() {
 		if (by_original) {
 			return *by_original;
@@ -341,12 +351,14 @@ public:
 	uint32_t last_generated_column() {
 		return *ptr->last_generated_column;
 	}
+#ifdef DEBUG
 	void dump() {
 		if (ptr)
 			ptr->dump();
 		else
 			client::console.log("Invalid Mapping object");
 	}
+#endif
 	Mapping(const RawMapping* ptr): ptr(ptr){}
 private:
 	const RawMapping* ptr;
@@ -642,18 +654,21 @@ public:
 			ptr = nullptr;
 		}
 	}
+#ifdef DEBUG
 	void dump() {
 		if (ptr)
 			ptr->dump();
 		else
 			client::console.log("Invalid Mappings object");
 	}
+#endif
 private:
 	Mappings(RawMappings* ptr): ptr(ptr) {}
 	RawMappings* ptr;
 };
 
 
+#ifdef DEBUG
 [[cheerp::jsexport]]
 extern "C"  void test() {
 	char testbase[] = {'A', 'Z', 'a', 'z', '0', '9', '/'};
@@ -685,3 +700,4 @@ extern "C"  void test() {
 	mappings->dump();
 	delete mappings;
 }
+#endif
