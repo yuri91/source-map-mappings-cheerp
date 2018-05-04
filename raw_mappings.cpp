@@ -11,10 +11,8 @@ RawMappings::LazyMappings& RawMappings::source_buckets_slow() {
 	for (const RawMapping& m: by_generated) {
 		if (!m.original)
 			continue;
-		while (originals.size() <= m.original->source) {
-			originals.push_back(
-				LazilySorted<RawMapping, cmp::ByOriginalLocation>()
-			);
+		if (originals.size() <= m.original->source) {
+			originals.resize(m.original->source+1);
 		}
 		originals[m.original->source].push_back(m);
 	}
