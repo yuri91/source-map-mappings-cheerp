@@ -18,8 +18,8 @@ int32_t base64_decode(char in) {
 		return -1;
 	}
 }
-int64_t vlq_decode(std::string::const_iterator& it) {
-	int64_t r = 0;
+int32_t vlq_decode(std::string::const_iterator& it) {
+	int32_t r = 0;
 	uint32_t shift = 0;
 	bool hasContinuationBit = false;
 	do {
@@ -39,8 +39,8 @@ int64_t vlq_decode(std::string::const_iterator& it) {
 	return shouldNegate ? -r : r ;
 }
 void read_relative_vlq(uint32_t& prev, std::string::const_iterator& it) {
-	int64_t decoded = vlq_decode(it);
-	int64_t v = decoded + prev;
+	int32_t decoded = vlq_decode(it);
+	int32_t v = decoded + prev;
 	// TODO check too big
 	if (v < 0)
 		last_error = Error::UnexpectedNegativeNumber;

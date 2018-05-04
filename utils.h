@@ -39,7 +39,7 @@ enum Error {
 extern Error last_error;
 
 int32_t base64_decode(char in);
-int64_t vlq_decode(std::string::const_iterator& it);
+int32_t vlq_decode(std::string::const_iterator& it);
 void read_relative_vlq(uint32_t& prev, std::string::const_iterator& it);
 
 #endif
