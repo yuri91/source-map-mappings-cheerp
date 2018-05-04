@@ -2,21 +2,31 @@
 
 Error last_error = Error::NoError;
 
-int32_t base64_decode(char in) {
-	// TODO error handling
-	if (in == '+') {
-		return 62;
-	} else if (in == '/') {
-		return 63;
-	} else if (in >= 'A' && in <= 'Z') {
-		return in - 'A';
-	} else if (in >= 'a' && in <= 'z') {
-		return in - 'a' + ('z' - 'a') + 1;
-	} else if (in >= '0' && in <= '9'){
-		return in - '0' + ('Z' - 'A') + ('z' - 'a') + 2;
-	} else {
-		return -1;
+class Base64Table {
+	char table[256];
+public:
+	Base64Table() {
+		memset(table, -1, 256);
+		table['+'] = 62;
+		table['/'] = 63;
+		for (char i = 'A'; i <= 'Z'; i++) {
+			table[i] = i - 'A';
+		}
+		for (char i = 'a'; i <= 'z'; i++) {
+			table[i] = i - 'a' + ('z' - 'a') + 1;
+		}
+		for (char i = '0'; i <= '9'; i++) {
+			table[i] = i - '0' + ('Z' - 'A') + ('z' - 'a') + 2;
+		}
 	}
+	inline char lookup(char in) {
+		return table[in];
+	}
+};
+static Base64Table base64_table;
+
+int32_t base64_decode(char in) {
+	return base64_table.lookup(in);
 }
 int32_t vlq_decode(std::string::const_iterator& it) {
 	int32_t r = 0;
