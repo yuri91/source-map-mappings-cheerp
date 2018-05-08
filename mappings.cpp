@@ -45,11 +45,12 @@ public:
 		, last_generated_column(NO_DATA)
 	{
 		if (ptr->original) {
-			source = ptr->original->source;
-			original_line = ptr->original->line;
-			original_column = ptr->original->column;
-			if (ptr->original->name)
-				name = *ptr->original->name;
+			const auto& original = *ptr->original;
+			source = original.source;
+			original_line = original.line;
+			original_column = original.column;
+			if (original.name)
+				name = *original.name;
 		}
 		if (ptr->last_generated_column) {
 			last_generated_column = *ptr->last_generated_column;
@@ -139,10 +140,13 @@ public:
 
 	Mapping* next() {
 		if (it != end) {
-			if (!it->original || it->original->line != line) {
+			if (!it->original)
+				return nullptr;
+			const auto& original = *it->original;
+			if (original.line != line) {
 				return nullptr;
 			}
-			if (has_column && (!it->original || it->original->column != column))  {
+			if (has_column && original.column != column)  {
 				return nullptr;
 			}
 			Mapping* ret = new Mapping(it++);
