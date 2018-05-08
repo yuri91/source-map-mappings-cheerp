@@ -74,29 +74,72 @@ public:
 	}
 };
 
+class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsOriginalIterator {
+
+	using LazyMappings = LazilySorted<RawMapping, cmp::ByOriginalLocation>;
+	const RawMapping* it;
+	const RawMapping* end;
+	LazyMappings* buckets_it;
+	LazyMappings* buckets_end;
+public:
+	MappingsOriginalIterator(LazyMappings* buckets_begin, LazyMappings* buckets_end)
+		: buckets_it(buckets_begin), buckets_end(buckets_end) {
+			if (buckets_it != buckets_end) {
+				it = &*buckets_it->get().begin();
+				end = &*buckets_it->get().end();
+			} else {
+				it = end = nullptr;
+			}
+		}
+	Mapping* next() {
+		while(true) {
+			if (it != end) {
+				Mapping* ret = new Mapping(it);
+				it++;
+				return ret;
+			} else if (++buckets_it != buckets_end) {
+				it = &*buckets_it->get().begin();
+				end = &*buckets_it->get().end();
+				continue;
+			} else {
+				return nullptr;
+			}
+		}
+	}
+};
+
 class [[cheerp::jsexport]] [[cheerp::genericjs]] AllGeneratedLocationsFor {
-	MappingsIterator* it;
+	const RawMapping* it;
+	const RawMapping* end;
 	uint32_t line;
 	bool has_column;
 	uint32_t column;
 public:
-	AllGeneratedLocationsFor(MappingsIterator* it,
-	                         uint32_t original_line,
-	                         bool has_original_column,
-	                         uint32_t original_column)
-		:it(it)
-		,line(original_line)
-		,has_column(has_original_column)
-		,column(original_column) {}
+	AllGeneratedLocationsFor(
+		const RawMapping* begin,
+		const RawMapping* end,
+		uint32_t original_line,
+		bool has_original_column,
+		uint32_t original_column
+	)
+		: it(begin)
+		, end(end)
+		, line(original_line)
+		, has_column(has_original_column)
+		, column(original_column)
+	{
+	}
+
 	Mapping* next() {
-		if (Mapping* m = it->next()) {
-			if (m->original_line() != line) {
+		if (it != end) {
+			if (!it->original || it->original->line != line) {
 				return nullptr;
 			}
-			if (has_column && m->original_column() != column)  {
+			if (has_column && (!it->original || it->original->column != column))  {
 				return nullptr;
 			}
-			return &*m;
+			Mapping* ret = new Mapping(it++);
+			return ret;
 		}
 		return nullptr;
 	}
@@ -158,13 +201,20 @@ public:
 			original_line = lower->original->line;
 		original_column = lower->original->column;
 
-		return new AllGeneratedLocationsFor(iter,
-		                                    original_line,
-		                                    has_original_column,
-		                                    original_column);
+		return new AllGeneratedLocationsFor(
+			&*lower,
+			&*by_original.end(),
+			original_line,
+			has_original_column,
+			original_column
+		);
 	}
 	MappingsIterator* by_generated_location() {
 		return new MappingsIterator(&*ptr->by_generated.begin(), &*ptr->by_generated.end());
+	}
+	MappingsOriginalIterator* by_original_location() {
+		auto& source_buckets = ptr->source_buckets();
+		return new MappingsOriginalIterator(&*source_buckets.begin(), &*source_buckets.end());
 	}
 	void destroy() {
 		if (ptr) {
