@@ -13,47 +13,56 @@ extern "C" int get_last_error() {
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mapping {
 public:
-	uint32_t generated_line(){
-		return ptr->generated_line;
+	static constexpr int32_t NO_DATA = -1;
+	uint32_t get_generated_line(){
+		return generated_line;
 	}
-	uint32_t generated_column(){
-		return ptr->generated_column;
+	uint32_t get_generated_column(){
+		return generated_column;
 	}
-	bool has_original_location(){
-		return bool(ptr->original);
+	int32_t get_source(){
+		return source;
 	}
-	uint32_t source(){
-		return ptr->original->source;
+	int32_t get_original_line(){
+		return original_line;
 	}
-	uint32_t original_line(){
-		return ptr->original->line;
+	int32_t get_original_column(){
+		return original_column;
 	}
-	uint32_t original_column(){
-		return ptr->original->column;
+	int32_t get_name() {
+		return name;
 	}
-	bool has_name(){
-		return bool(ptr->original) && bool(ptr->original->name);
+	int32_t get_last_generated_column() {
+		return last_generated_column;
 	}
-	uint32_t name() {
-		return *ptr->original->name;
+	Mapping(const RawMapping* ptr)
+		: generated_line(ptr->generated_line)
+		, generated_column(ptr->generated_column)
+		, source(NO_DATA)
+		, original_line(NO_DATA)
+		, original_column(NO_DATA)
+		, name(NO_DATA)
+		, last_generated_column(NO_DATA)
+	{
+		if (ptr->original) {
+			source = ptr->original->source;
+			original_line = ptr->original->line;
+			original_column = ptr->original->column;
+			if (ptr->original->name)
+				name = *ptr->original->name;
+		}
+		if (ptr->last_generated_column) {
+			last_generated_column = *ptr->last_generated_column;
+		}
 	}
-	bool has_last_generated_column() {
-		return bool(ptr->last_generated_column);
-	}
-	uint32_t last_generated_column() {
-		return *ptr->last_generated_column;
-	}
-#ifdef DEBUG
-	void dump() {
-		if (ptr)
-			ptr->dump();
-		else
-			client::console.log("Invalid Mapping object");
-	}
-#endif
-	Mapping(const RawMapping* ptr): ptr(ptr){}
 private:
-	const RawMapping* ptr;
+	uint32_t generated_line;
+	uint32_t generated_column;
+	int32_t source;
+	int32_t original_line;
+	int32_t original_column;
+	int32_t name;
+	int32_t last_generated_column;
 };
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsIterator {
