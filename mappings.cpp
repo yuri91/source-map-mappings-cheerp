@@ -156,28 +156,42 @@ public:
 	void compute_column_spans() {
 		ptr->compute_column_spans();
 	}
-	Mapping* original_location_for(uint32_t generated_line,
-	                               uint32_t generated_column,
-	                               Bias bias) {
-		const RawMapping* ret = ptr->original_location_for(generated_line, generated_column, bias);
+	Mapping* original_location_for(
+		uint32_t generated_line,
+		uint32_t generated_column,
+		Bias bias
+	) {
+		const RawMapping* ret = ptr->original_location_for(
+			generated_line,
+			generated_column,
+			bias
+		);
 		if (ret==nullptr)
 			return nullptr;
 		return new Mapping(ret);
 	}
-	Mapping* generated_location_for(uint32_t source,
-	                                uint32_t original_line,
-	                                uint32_t original_column,
-	                                Bias bias) {
-		const RawMapping* ret = ptr->generated_location_for(source, original_line, original_column, bias);
+	Mapping* generated_location_for(
+		uint32_t source,
+		uint32_t original_line,
+		uint32_t original_column,
+		Bias bias
+	) {
+		const RawMapping* ret = ptr->generated_location_for(
+			source,
+			original_line,
+			original_column,
+			bias
+		);
 		if (ret == nullptr)
 			return nullptr;
 		return new Mapping(ret);
 	}
-	AllGeneratedLocationsFor*
-	all_generated_locations_for(uint32_t source,
-	                            uint32_t original_line,
-	                            bool has_original_column,
-	                            uint32_t original_column) {
+	AllGeneratedLocationsFor* all_generated_locations_for(
+		uint32_t source,
+		uint32_t original_line,
+		bool has_original_column,
+		uint32_t original_column
+	) {
 		auto& source_buckets = ptr->source_buckets();
 		// TODO: original code is not doing exactly this
 		if (source >= source_buckets.size())
@@ -191,9 +205,12 @@ public:
 		o.column = original_column;
 		m.original = o;
 
-		auto lower = std::lower_bound(by_original.begin(),
-		                              by_original.end(),
-		                              m, cmp::ByOriginalLocationOnly());
+		auto lower = std::lower_bound(
+			by_original.begin(),
+			by_original.end(),
+			m,
+			cmp::ByOriginalLocationOnly()
+		);
 		MappingsIterator* iter = new MappingsIterator(&*lower, &*by_original.end());
 		if (!has_original_column)
 			original_line = lower->original->line;
