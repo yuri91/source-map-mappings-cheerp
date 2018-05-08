@@ -1,12 +1,10 @@
-#include <vector>
+#include "raw_mappings.h"
+#include "comparators.h"
+
 #include <algorithm>
 #include <memory>
 #include <cstring>
-#include <experimental/optional>
 #include <cheerp/client.h>
-
-#include "raw_mappings.h"
-#include "comparators.h"
 
 [[cheerp::jsexport]]
 extern "C" int get_last_error() {
