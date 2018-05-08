@@ -2,6 +2,15 @@
 
 Error last_error = Error::NoError;
 
+#ifdef DEBUG
+std::ostream& operator<<(std::ostream& os, const indent& ind) {
+	for (int i = 0; i < ind.level; i++) {
+		os << '\t';
+	}
+	return os;
+}
+#endif
+
 class Base64Table {
 	char table[256];
 public:

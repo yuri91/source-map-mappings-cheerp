@@ -20,12 +20,7 @@ struct indent {
 		return i;
 	}
 };
-std::ostream& operator<<(std::ostream& os, const indent& ind) {
-	for (int i = 0; i < ind.level; i++) {
-		os << '\t';
-	}
-	return os;
-}
+std::ostream& operator<<(std::ostream& os, const indent& ind);
 #endif
 
 enum Error {

@@ -204,14 +204,14 @@ extern "C"  void test() {
 	std::string test[] = {"A", "C", "D", "2H", "qxmvrH"};
 
 	for(int i = 0; i < 5; i++) {
-		auto it = test[i].begin();
+		std::string::const_iterator it = test[i].begin();
 		std::cout<<"test vlq "<<i<<":"<<test[i]<<" -> "<<vlq_decode(it)<<std::endl;
 		assert(it==test[i].end());
 	}
 
 	std::cout<<"------------------------------------------"<<std::endl;
 	std::string testmappings = ";EAAC,ACAA;EACA,CAAC;EACD";
-	RawMappings* mappings = parse_mappings_impl(testmappings);
+	RawMappings* mappings = RawMappings::create(testmappings);
 	if (last_error != Error::NoError) {
 		std::cout<< "Error "<<last_error<<std::endl;
 	}
