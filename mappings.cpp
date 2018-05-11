@@ -152,11 +152,15 @@ public:
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mappings {
 public:
-	static Mappings* create(const client::String* js_input) {
+	static Mappings* create(
+			const client::String* js_input,
+			client::TArray<client::String>* sources,
+			client::TArray<client::String>* names
+		) {
 		std::string input(*js_input);
 		RawMappings* res = RawMappings::create(std::move(input));
 		if (res)
-			return new Mappings(res);
+			return new Mappings(res, sources, names);
 		else
 			return nullptr;
 	}
@@ -253,8 +257,17 @@ public:
 	}
 #endif
 private:
-	Mappings(RawMappings* ptr): ptr(ptr) {}
+	Mappings(
+		RawMappings* ptr,
+		client::TArray<client::String>* sources,
+		client::TArray<client::String>* names
+	)	: ptr(ptr)
+		, sources(new ArraySet(sources))
+		, names(new ArraySet(names))
+	{}
 	RawMappings* ptr;
+	ArraySet* sources;
+	ArraySet* names;
 };
 
 

@@ -84,6 +84,13 @@ public:
 		: array(new client::TArray<client::String>())
 		, map(new client::TMap<client::String*, uint32_t>())
 	{}
+	ArraySet(client::TArray<client::String>* arr)
+		: array(arr)
+		, map(new client::TMap<client::String*, uint32_t>()) {
+		for (int i = 0; i < array->get_length(); i++) {
+			map->set((*array)[i], i);
+		}
+	}
 	void add(client::String* s, bool allow_duplicate = false) {
 		uint32_t idx = array->get_length();
 		bool is_duplicate = map->has(s);
