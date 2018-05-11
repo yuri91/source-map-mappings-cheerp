@@ -50,6 +50,65 @@ private:
 	}
 };
 
+namespace [[cheerp::genericjs]] client {
+	class Map: public Object {
+	public:
+		Map();
+		template<typename K, typename V>
+		void set(K k, V v);
+		template<typename K, typename V>
+		V get(K k);
+		template<typename K>
+		bool has(K k);
+	};
+	template<typename K, typename V>
+	class TMap: public Map {
+	public:
+		TMap(): Map() {}
+		void set(K k, V v) {
+			Map::set<K,V>(k,v);
+		}
+		V get(K k) {
+			return Map::get<K,V>(k);
+		}
+		bool has(K k) {
+			return Map::has<K>(k);
+		}
+	};
+}
+class [[cheerp::genericjs]] ArraySet {
+	client::TArray<client::String>* array;
+	client::TMap<client::String*, uint32_t>* map;
+public:
+	ArraySet()
+		: array(new client::TArray<client::String>())
+		, map(new client::TMap<client::String*, uint32_t>())
+	{}
+	void add(client::String* s, bool allow_duplicate = false) {
+		uint32_t idx = array->get_length();
+		bool is_duplicate = map->has(s);
+		if (!is_duplicate || allow_duplicate)
+			array->push(s);
+		if (!is_duplicate)
+			map->set(s, idx);
+	}
+	client::String* at(uint32_t idx) {
+		if (idx < array->get_length()) {
+			return (*array)[idx];
+		}
+		return nullptr;
+	}
+	uint32_t index_of(client::String* s) {
+		if (map->has(s))
+			return map->get(s);
+		client::String* err = new client::String("'");
+		err = err->concat(s);
+		err = err->concat("' is not in the set");
+		__asm__("throw new Error(%0)" : : "r"(err));
+		return 0;
+	}
+};
+
 template<class T>
 using optional = std::experimental::optional<T>;
 
