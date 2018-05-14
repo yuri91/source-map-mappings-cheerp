@@ -128,6 +128,8 @@ namespace client {
 		void set_line(client::Object*);
 		void set_column(client::Object*);
 		void set_lastColumn(client::Object*);
+		void set_source(client::String*);
+		void set_name(client::String*);
 	};
 }
 
@@ -148,19 +150,33 @@ public:
 	void compute_column_spans() {
 		ptr->compute_column_spans();
 	}
-	Mapping* original_location_for(
+	client::Object* original_location_for(
 		uint32_t generated_line,
 		uint32_t generated_column,
 		Bias bias
 	) {
-		const RawMapping* ret = ptr->original_location_for(
+		const RawMapping* raw = ptr->original_location_for(
 			generated_line,
 			generated_column,
 			bias
 		);
-		if (ret==nullptr)
-			return nullptr;
-		return new Mapping(ret, sources, names);
+		client::OriginalLocation* ret = new client::OriginalLocation();
+		if (raw==nullptr || !raw->original) {
+			ret->set_line(nullptr);
+			ret->set_column(nullptr);
+			ret->set_name(nullptr);
+			ret->set_source(nullptr);
+		} else {
+			const auto& orig = raw->original;
+			ret->set_line(nullable<double>(orig->line));
+			ret->set_column(nullable<double>(orig->column));
+			if (orig->name)
+				ret->set_name(names->at(*orig->name));
+			else
+				ret->set_name(nullptr);
+			ret->set_source(sources->at(orig->source));
+		}
+		return ret;
 	}
 	Mapping* generated_location_for(
 		uint32_t source,
