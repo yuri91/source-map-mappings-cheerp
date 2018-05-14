@@ -123,7 +123,7 @@ public:
 };
 
 namespace client {
-	class [[cheerp::genericjs]] OriginalLocation: public Object {
+	class [[cheerp::genericjs]] MappingObject: public Object {
 	public:
 		void set_line(client::Object*);
 		void set_column(client::Object*);
@@ -160,7 +160,7 @@ public:
 			generated_column,
 			bias
 		);
-		client::OriginalLocation* ret = new client::OriginalLocation();
+		client::MappingObject* ret = new client::MappingObject();
 		if (raw==nullptr || !raw->original) {
 			ret->set_line(nullptr);
 			ret->set_column(nullptr);
@@ -239,7 +239,7 @@ public:
 			if (has_original_column && original.column != original_column)  {
 				return ret;
 			}
-			client::OriginalLocation* orig = new client::OriginalLocation();
+			client::MappingObject* orig = new client::MappingObject();
 			orig->set_line(nullable<double>(it->generated_line));
 			orig->set_column(nullable<double>(it->generated_column));
 			nullable<double> last_column;
