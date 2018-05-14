@@ -150,7 +150,7 @@ public:
 	void compute_column_spans() {
 		ptr->compute_column_spans();
 	}
-	client::Object* original_location_for(
+	client::MappingObject* original_location_for(
 		uint32_t generated_line,
 		uint32_t generated_column,
 		Bias bias
@@ -178,23 +178,37 @@ public:
 		}
 		return ret;
 	}
-	Mapping* generated_location_for(
+	client::MappingObject* generated_location_for(
 		uint32_t source,
 		uint32_t original_line,
 		uint32_t original_column,
 		Bias bias
 	) {
-		const RawMapping* ret = ptr->generated_location_for(
+		const RawMapping* raw = ptr->generated_location_for(
 			source,
 			original_line,
 			original_column,
 			bias
 		);
-		if (ret == nullptr)
-			return nullptr;
-		return new Mapping(ret, sources, names);
+		client::MappingObject* ret = new client::MappingObject();
+		if (raw == nullptr) {
+			ret->set_line(nullptr);
+			ret->set_column(nullptr);
+			ret->set_lastColumn(nullptr);
+		} else {
+			ret->set_line(nullable<double>(raw->generated_line));
+			ret->set_column(nullable<double>(raw->generated_column));
+			nullable<double> last_column;
+			if (raw->last_generated_column) {
+				last_column = *raw->last_generated_column;
+			}
+			else if (ptr->computed_column_spans)
+				last_column = std::numeric_limits<double>::infinity();
+			ret->set_lastColumn(last_column);
+		}
+		return ret;
 	}
-	client::TArray<client::Object>* all_generated_locations_for(
+	client::TArray<client::MappingObject>* all_generated_locations_for(
 		uint32_t source,
 		uint32_t original_line,
 		bool has_original_column,
@@ -228,7 +242,7 @@ public:
 			original_line = lower->original->line;
 		original_column = lower->original->column;
 
-		client::TArray<client::Object>* ret = new client::TArray<client::Object>();
+		client::TArray<client::MappingObject>* ret = new client::TArray<client::MappingObject>();
 		for (auto it = lower; it != by_original.end(); ++it) {
 			if (!it->original)
 				return ret;
