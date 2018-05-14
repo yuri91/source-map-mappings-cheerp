@@ -99,13 +99,13 @@ public:
 		if (!is_duplicate)
 			map->set(s, idx);
 	}
-	client::String* at(uint32_t idx) {
+	client::String* at(uint32_t idx) const {
 		if (idx < array->get_length()) {
 			return (*array)[idx];
 		}
 		return nullptr;
 	}
-	uint32_t index_of(client::String* s) {
+	uint32_t index_of(client::String* s) const {
 		if (map->has(s))
 			return map->get(s);
 		client::String* err = new client::String("'");

@@ -96,7 +96,9 @@ const RawMapping* RawMappings::generated_location_for (
 			return nullptr;
 		ret = &*it;
 	}
-	return ret;
+	if (ret->original && ret->original->source == source)
+		return ret;
+	return nullptr;
 }
 
 std::pair<RawMappings*, Error> RawMappings::create(const std::string& input) {

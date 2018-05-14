@@ -90,7 +90,7 @@ public:
 		while (it != by_generated.end()) {
 			RawMapping& m = *it++;
 			if (it != by_generated.end() && it->generated_line == m.generated_line) {
-				m.last_generated_column = it->generated_column;
+				m.last_generated_column = it->generated_column - 1;
 			}
 		}
 		computed_column_spans = true;

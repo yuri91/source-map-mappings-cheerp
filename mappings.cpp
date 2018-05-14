@@ -14,7 +14,7 @@ public:
 	uint32_t get_generated_column(){
 		return generated_column;
 	}
-	client::Object* get_source(){
+	client::String* get_source(){
 		return source;
 	}
 	client::Object* get_original_line(){
@@ -23,23 +23,23 @@ public:
 	client::Object* get_original_column(){
 		return original_column;
 	}
-	client::Object* get_name() {
+	client::String* get_name() {
 		return name;
 	}
 	client::Object* get_last_generated_column() {
 		return last_generated_column;
 	}
-	Mapping(const RawMapping* ptr)
+	Mapping(const RawMapping* ptr, const ArraySet* sources, const ArraySet* names)
 		: generated_line(ptr->generated_line)
 		, generated_column(ptr->generated_column)
 	{
 		if (ptr->original) {
 			const auto& original = *ptr->original;
-			source = original.source;
+			source = sources->at(original.source);
 			original_line = original.line;
 			original_column = original.column;
 			if (original.name)
-				name = *original.name;
+				name = names->at(*original.name);
 		}
 		if (ptr->last_generated_column) {
 			last_generated_column = *ptr->last_generated_column;
@@ -48,22 +48,28 @@ public:
 private:
 	uint32_t generated_line;
 	uint32_t generated_column;
-	nullable<double> source;
+	client::String* source;
+	client::String* name;
 	nullable<double> original_line;
 	nullable<double> original_column;
-	nullable<double> name;
 	nullable<double> last_generated_column;
 };
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsIterator {
 	const RawMapping* it;
 	const RawMapping* end;
+	const ArraySet* sources;
+	const ArraySet* names;
 public:
-	MappingsIterator(const RawMapping* begin, const RawMapping* end)
-		: it(begin), end(end) {}
+	MappingsIterator(
+		const RawMapping* begin,
+		const RawMapping* end,
+		const ArraySet* sources,
+		const ArraySet* names
+	): it(begin), end(end), sources(sources), names(names) {}
 	Mapping* next() {
 		if (it != end) {
-			Mapping* ret = new Mapping(it);
+			Mapping* ret = new Mapping(it, sources, names);
 			it++;
 			return ret;
 		}
@@ -78,20 +84,31 @@ class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsOriginalIterator {
 	const RawMapping* end;
 	LazyMappings* buckets_it;
 	LazyMappings* buckets_end;
+	const ArraySet* sources;
+	const ArraySet* names;
 public:
-	MappingsOriginalIterator(LazyMappings* buckets_begin, LazyMappings* buckets_end)
-		: buckets_it(buckets_begin), buckets_end(buckets_end) {
-			if (buckets_it != buckets_end) {
-				it = &*buckets_it->get().begin();
-				end = &*buckets_it->get().end();
-			} else {
-				it = end = nullptr;
-			}
+	MappingsOriginalIterator(
+		LazyMappings* buckets_begin,
+		LazyMappings* buckets_end,
+		const ArraySet* sources,
+		const ArraySet* names
+	)
+		: buckets_it(buckets_begin)
+		, buckets_end(buckets_end)
+		, sources(sources)
+		, names(names)
+	{
+		if (buckets_it != buckets_end) {
+			it = &*buckets_it->get().begin();
+			end = &*buckets_it->get().end();
+		} else {
+			it = end = nullptr;
 		}
+	}
 	Mapping* next() {
 		while(true) {
 			if (it != end) {
-				Mapping* ret = new Mapping(it);
+				Mapping* ret = new Mapping(it, sources, names);
 				it++;
 				return ret;
 			} else if (++buckets_it != buckets_end) {
@@ -111,19 +128,25 @@ class [[cheerp::jsexport]] [[cheerp::genericjs]] AllGeneratedLocationsFor {
 	uint32_t line;
 	bool has_column;
 	uint32_t column;
+	const ArraySet* sources;
+	const ArraySet* names;
 public:
 	AllGeneratedLocationsFor(
 		const RawMapping* begin,
 		const RawMapping* end,
 		uint32_t original_line,
 		bool has_original_column,
-		uint32_t original_column
+		uint32_t original_column,
+		const ArraySet* sources,
+		const ArraySet* names
 	)
 		: it(begin)
 		, end(end)
 		, line(original_line)
 		, has_column(has_original_column)
 		, column(original_column)
+		, sources(sources)
+		, names(names)
 	{
 	}
 
@@ -138,7 +161,7 @@ public:
 			if (has_column && original.column != column)  {
 				return nullptr;
 			}
-			Mapping* ret = new Mapping(it++);
+			Mapping* ret = new Mapping(it++, sources, names);
 			return ret;
 		}
 		return nullptr;
@@ -174,7 +197,7 @@ public:
 		);
 		if (ret==nullptr)
 			return nullptr;
-		return new Mapping(ret);
+		return new Mapping(ret, sources, names);
 	}
 	Mapping* generated_location_for(
 		uint32_t source,
@@ -190,7 +213,7 @@ public:
 		);
 		if (ret == nullptr)
 			return nullptr;
-		return new Mapping(ret);
+		return new Mapping(ret, sources, names);
 	}
 	AllGeneratedLocationsFor* all_generated_locations_for(
 		uint32_t source,
@@ -217,7 +240,11 @@ public:
 			m,
 			cmp::ByOriginalLocationOnly()
 		);
-		MappingsIterator* iter = new MappingsIterator(&*lower, &*by_original.end());
+		MappingsIterator* iter = new MappingsIterator(
+			&*lower,
+			&*by_original.end(),
+			sources, names
+		);
 		if (!has_original_column)
 			original_line = lower->original->line;
 		original_column = lower->original->column;
@@ -227,15 +254,25 @@ public:
 			&*by_original.end(),
 			original_line,
 			has_original_column,
-			original_column
+			original_column,
+			sources,
+			names
 		);
 	}
 	MappingsIterator* by_generated_location() {
-		return new MappingsIterator(&*ptr->by_generated.begin(), &*ptr->by_generated.end());
+		return new MappingsIterator(
+			&*ptr->by_generated.begin(),
+			&*ptr->by_generated.end(),
+			sources, names
+		);
 	}
 	MappingsOriginalIterator* by_original_location() {
 		auto& source_buckets = ptr->source_buckets();
-		return new MappingsOriginalIterator(&*source_buckets.begin(), &*source_buckets.end());
+		return new MappingsOriginalIterator(
+			&*source_buckets.begin(),
+			&*source_buckets.end(),
+			sources, names
+		);
 	}
 	void destroy() {
 		if (ptr) {
