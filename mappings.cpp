@@ -122,51 +122,14 @@ public:
 	}
 };
 
-class [[cheerp::jsexport]] [[cheerp::genericjs]] AllGeneratedLocationsFor {
-	const RawMapping* it;
-	const RawMapping* end;
-	uint32_t line;
-	bool has_column;
-	uint32_t column;
-	const ArraySet* sources;
-	const ArraySet* names;
-public:
-	AllGeneratedLocationsFor(
-		const RawMapping* begin,
-		const RawMapping* end,
-		uint32_t original_line,
-		bool has_original_column,
-		uint32_t original_column,
-		const ArraySet* sources,
-		const ArraySet* names
-	)
-		: it(begin)
-		, end(end)
-		, line(original_line)
-		, has_column(has_original_column)
-		, column(original_column)
-		, sources(sources)
-		, names(names)
-	{
-	}
-
-	Mapping* next() {
-		if (it != end) {
-			if (!it->original)
-				return nullptr;
-			const auto& original = *it->original;
-			if (original.line != line) {
-				return nullptr;
-			}
-			if (has_column && original.column != column)  {
-				return nullptr;
-			}
-			Mapping* ret = new Mapping(it++, sources, names);
-			return ret;
-		}
-		return nullptr;
-	}
-};
+namespace client {
+	class [[cheerp::genericjs]] OriginalLocation: public Object {
+	public:
+		void set_line(client::Object*);
+		void set_column(client::Object*);
+		void set_lastColumn(client::Object*);
+	};
+}
 
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mappings {
 public:
@@ -215,7 +178,7 @@ public:
 			return nullptr;
 		return new Mapping(ret, sources, names);
 	}
-	AllGeneratedLocationsFor* all_generated_locations_for(
+	client::TArray<client::Object>* all_generated_locations_for(
 		uint32_t source,
 		uint32_t original_line,
 		bool has_original_column,
@@ -249,15 +212,30 @@ public:
 			original_line = lower->original->line;
 		original_column = lower->original->column;
 
-		return new AllGeneratedLocationsFor(
-			&*lower,
-			&*by_original.end(),
-			original_line,
-			has_original_column,
-			original_column,
-			sources,
-			names
-		);
+		client::TArray<client::Object>* ret = new client::TArray<client::Object>();
+		for (auto it = lower; it != by_original.end(); ++it) {
+			if (!it->original)
+				return ret;
+			const auto& original = *it->original;
+			if (original.line != original_line) {
+				return ret;
+			}
+			if (has_original_column && original.column != original_column)  {
+				return ret;
+			}
+			client::OriginalLocation* orig = new client::OriginalLocation();
+			orig->set_line(nullable<double>(it->generated_line));
+			orig->set_column(nullable<double>(it->generated_column));
+			nullable<double> last_column;
+			if (it->last_generated_column) {
+				last_column = *it->last_generated_column;
+			}
+			else if (ptr->computed_column_spans)
+				last_column = std::numeric_limits<double>::infinity();
+			orig->set_lastColumn(nullable<double>(last_column));
+			ret->push(orig);
+		}
+		return ret;
 	}
 	MappingsIterator* by_generated_location() {
 		return new MappingsIterator(

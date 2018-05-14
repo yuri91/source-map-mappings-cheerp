@@ -115,10 +115,10 @@ public:
 		return *by_original;
 	}
 	std::vector<RawMapping> by_generated;
+	bool computed_column_spans{false};
 private:
 	LazyMappings& source_buckets_slow();
 
-	bool computed_column_spans{false};
 	optional<LazyMappings> by_original;
 };
 
