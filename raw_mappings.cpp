@@ -50,7 +50,7 @@ const RawMapping* RawMappings::original_location_for (
 			return nullptr;
 		ret = &*it;
 	}
-	if (!ret->original)
+	if (!ret->original || generated_line != ret->generated_line)
 		return nullptr;
 	return ret;
 }
