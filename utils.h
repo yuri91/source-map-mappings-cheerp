@@ -143,10 +143,12 @@ enum Error {
 	VlqInvalidBase64 = 4,
 	VlqOverflow = 5,
 };
-extern Error last_error;
+[[cheerp::genericjs]]
+[[noreturn]]
+void throw_error(Error e);
 
 int32_t base64_decode(char in);
-int32_t vlq_decode(std::string::const_iterator& it);
-void read_relative_vlq(uint32_t& prev, std::string::const_iterator& it);
+std::pair<int32_t, Error> vlq_decode(std::string::const_iterator& it);
+Error read_relative_vlq(uint32_t& prev, std::string::const_iterator& it);
 
 #endif

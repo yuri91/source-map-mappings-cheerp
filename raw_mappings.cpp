@@ -99,8 +99,7 @@ const RawMapping* RawMappings::generated_location_for (
 	return ret;
 }
 
-RawMappings* RawMappings::create(const std::string& input) {
-	last_error = Error::NoError;
+std::pair<RawMappings*, Error> RawMappings::create(const std::string& input) {
 	std::unique_ptr<RawMappings> mappings = std::make_unique<RawMappings>();
 
 	auto in_begin = input.begin();
@@ -113,6 +112,7 @@ RawMappings* RawMappings::create(const std::string& input) {
 	uint32_t source = 0;
 	uint32_t name = 0;
 	uint32_t generated_line_start_index = 0;
+	Error err = Error::NoError;
 
 	std::vector<RawMapping> by_generated;
 	by_generated.reserve(in_len / 2);
@@ -137,33 +137,33 @@ RawMappings* RawMappings::create(const std::string& input) {
 		RawMapping m;
 		m.generated_line = generated_line;
 
-		read_relative_vlq(generated_column, it);
-		if (last_error != Error::NoError) {
-			return nullptr;
+		err = read_relative_vlq(generated_column, it);
+		if (err != Error::NoError) {
+			return std::make_pair(nullptr, err);
 		}
 		m.generated_column = generated_column;
 
 		if (it != in_end && *it != ';' && *it != ',') {
 			OriginalLocation o;
-			read_relative_vlq(source, it);
-			if (last_error != Error::NoError) {
-				return nullptr;
+			err = read_relative_vlq(source, it);
+			if (err != Error::NoError) {
+				return std::make_pair(nullptr, err);
 			}
 			o.source = source;
-			read_relative_vlq(original_line, it);
-			if (last_error != Error::NoError) {
-				return nullptr;
+			err = read_relative_vlq(original_line, it);
+			if (err != Error::NoError) {
+				return std::make_pair(nullptr, err);
 			}
 			o.line = original_line+1;
-			read_relative_vlq(original_column, it);
-			if (last_error != Error::NoError) {
-				return nullptr;
+			err = read_relative_vlq(original_column, it);
+			if (err != Error::NoError) {
+				return std::make_pair(nullptr, err);
 			}
 			o.column = original_column;
 			if (it != in_end && *it != ';' && *it != ',') {
-				read_relative_vlq(name, it);
-				if (last_error != Error::NoError) {
-					return nullptr;
+				err = read_relative_vlq(name, it);
+				if (err != Error::NoError) {
+					return std::make_pair(nullptr, err);
 				}
 				o.name = name;
 			}
@@ -177,5 +177,5 @@ RawMappings* RawMappings::create(const std::string& input) {
 		          comparator);
 	}
 	mappings->by_generated = std::move(by_generated);
-	return mappings.release();
+	return std::make_pair(mappings.release(), Error::NoError);
 }

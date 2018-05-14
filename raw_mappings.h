@@ -5,9 +5,6 @@
 
 #include <vector>
 
-[[cheerp::jsexport]]
-extern "C" int get_last_error();
-
 enum class Bias {
 	GreatestLowerBound = 1,
 	LeastUpperBound = 2,
@@ -109,7 +106,7 @@ public:
 		uint32_t original_column,
 		Bias bias
 	);
-	static RawMappings* create(const std::string& input);
+	static std::pair<RawMappings*, Error> create(const std::string& input);
 	LazyMappings& source_buckets() {
 		if (by_original) {
 			return *by_original;

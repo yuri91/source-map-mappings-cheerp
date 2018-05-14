@@ -1,7 +1,5 @@
 #include "utils.h"
 
-Error last_error = Error::NoError;
-
 #ifdef DEBUG
 std::ostream& operator<<(std::ostream& os, const indent& ind) {
 	for (int i = 0; i < ind.level; i++) {
@@ -10,6 +8,36 @@ std::ostream& operator<<(std::ostream& os, const indent& ind) {
 	return os;
 }
 #endif
+
+[[cheerp::genericjs]]
+[[noreturn]]
+void throw_error(Error e) {
+	client::String* msg = new client::String("Error parsing mappings (code ");
+	msg = msg->concat(e)->concat("): ");
+	switch (e) {
+	case Error::UnexpectedNegativeNumber:
+		msg = msg->concat("the mappings contained a negative line, column, source index, or name index");
+		break;
+	case Error::UnexpectedlyBigNumber:
+		msg = msg->concat("the mappings contained a number larger than 2**32");
+		break;
+	case Error::VlqUnexpectedEof:
+		msg = msg->concat("reached EOF while in the middle of parsing a VLQ");
+		break;
+	case Error::VlqInvalidBase64:
+		msg = msg->concat("invalid base 64 character while parsing a VLQ");
+		break;
+	case Error::VlqOverflow:
+		msg = msg->concat("the number parsed from the VLQ does not fit in a 64 bit integer");
+		break;
+	case Error::NoError:
+		msg = msg->concat("No error. This is a bug");
+		break;
+	}
+	__asm__("throw new Error(%0)" : : "r"(msg));
+	// This is to shut down the noreturn warning
+	while(true){}
+}
 
 class Base64Table {
 	char table[256];
@@ -37,15 +65,14 @@ static Base64Table base64_table;
 int32_t base64_decode(char in) {
 	return base64_table.lookup(in);
 }
-int32_t vlq_decode(std::string::const_iterator& it) {
+std::pair<int32_t, Error> vlq_decode(std::string::const_iterator& it) {
 	int32_t r = 0;
 	uint32_t shift = 0;
 	bool hasContinuationBit = false;
 	do {
 		int32_t i = base64_decode(*it);
 		if (i<0) {
-			last_error = Error::VlqInvalidBase64;
-			return 0;
+			return std::make_pair(i, Error::VlqInvalidBase64);
 		}
 		hasContinuationBit = i & 32;
 		i &= 31;
@@ -55,14 +82,20 @@ int32_t vlq_decode(std::string::const_iterator& it) {
 	} while (hasContinuationBit);
 	bool shouldNegate = r & 1;
 	r >>= 1;
-	return shouldNegate ? -r : r ;
+	return std::make_pair(shouldNegate ? -r : r, Error::NoError) ;
 }
-void read_relative_vlq(uint32_t& prev, std::string::const_iterator& it) {
-	int32_t decoded = vlq_decode(it);
+Error read_relative_vlq(uint32_t& prev, std::string::const_iterator& it) {
+	int32_t decoded;
+	Error err;
+	std::tie(decoded, err) = vlq_decode(it);
+	if (err != Error::NoError)
+		return err;
 	int32_t v = decoded + prev;
 	// TODO check too big
 	if (v < 0)
-		last_error = Error::UnexpectedNegativeNumber;
+		return Error::UnexpectedNegativeNumber;
 	else
 		prev = v;
+
+	return Error::NoError;
 }

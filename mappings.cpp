@@ -6,11 +6,6 @@
 #include <cstring>
 #include <cheerp/client.h>
 
-[[cheerp::jsexport]]
-extern "C" int get_last_error() {
-	return last_error;
-}
-
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mapping {
 public:
 	uint32_t get_generated_line(){
@@ -158,11 +153,11 @@ public:
 			client::TArray<client::String>* names
 		) {
 		std::string input(*js_input);
-		RawMappings* res = RawMappings::create(std::move(input));
-		if (res)
-			return new Mappings(res, sources, names);
+		std::pair<RawMappings*, Error> res = RawMappings::create(std::move(input));
+		if (res.second == Error::NoError)
+			return new Mappings(res.first, sources, names);
 		else
-			return nullptr;
+			throw_error(res.second);
 	}
 	void compute_column_spans() {
 		ptr->compute_column_spans();
@@ -296,11 +291,12 @@ extern "C"  void test() {
 
 	std::cout<<"------------------------------------------"<<std::endl;
 	std::string testmappings = ";EAAC,ACAA;EACA,CAAC;EACD";
-	RawMappings* mappings = RawMappings::create(testmappings);
-	if (last_error != Error::NoError) {
-		std::cout<< "Error "<<last_error<<std::endl;
+	auto mappings = RawMappings::create(testmappings);
+	if (mappings.second != Error::NoError) {
+		delete mappings.first;
+		throw_error(mappings.second);
 	}
-	mappings->dump();
-	delete mappings;
+	mappings.first->dump();
+	delete mappings.first;
 }
 #endif
