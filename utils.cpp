@@ -34,7 +34,13 @@ void throw_error(Error e) {
 		msg = msg->concat("No error. This is a bug");
 		break;
 	}
-	__asm__("throw new Error(%0)" : : "r"(msg));
+	throw_string(*msg);
+}
+
+[[cheerp::genericjs]]
+[[noreturn]]
+void throw_string(const client::String& s) {
+	__asm__("throw new Error(%0)" : : "r"(&s));
 	// This is to shut down the noreturn warning
 	while(true){}
 }

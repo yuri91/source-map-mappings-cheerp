@@ -6,6 +6,11 @@
 #include <cstring>
 #include <cheerp/client.h>
 
+enum class Order {
+	Generated = 1,
+	Original = 2
+};
+
 class [[cheerp::jsexport]] [[cheerp::genericjs]] Mapping {
 public:
 	uint32_t get_generated_line(){
@@ -55,81 +60,23 @@ private:
 	nullable<double> last_generated_column;
 };
 
-class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsIterator {
-	const RawMapping* it;
-	const RawMapping* end;
-	const ArraySet* sources;
-	const ArraySet* names;
-public:
-	MappingsIterator(
-		const RawMapping* begin,
-		const RawMapping* end,
-		const ArraySet* sources,
-		const ArraySet* names
-	): it(begin), end(end), sources(sources), names(names) {}
-	Mapping* next() {
-		if (it != end) {
-			Mapping* ret = new Mapping(it, sources, names);
-			it++;
-			return ret;
-		}
-		return nullptr;
-	}
-};
-
-class [[cheerp::jsexport]] [[cheerp::genericjs]] MappingsOriginalIterator {
-
-	using LazyMappings = LazilySorted<RawMapping, cmp::ByOriginalLocation>;
-	const RawMapping* it;
-	const RawMapping* end;
-	LazyMappings* buckets_it;
-	LazyMappings* buckets_end;
-	const ArraySet* sources;
-	const ArraySet* names;
-public:
-	MappingsOriginalIterator(
-		LazyMappings* buckets_begin,
-		LazyMappings* buckets_end,
-		const ArraySet* sources,
-		const ArraySet* names
-	)
-		: buckets_it(buckets_begin)
-		, buckets_end(buckets_end)
-		, sources(sources)
-		, names(names)
-	{
-		if (buckets_it != buckets_end) {
-			it = &*buckets_it->get().begin();
-			end = &*buckets_it->get().end();
-		} else {
-			it = end = nullptr;
-		}
-	}
-	Mapping* next() {
-		while(true) {
-			if (it != end) {
-				Mapping* ret = new Mapping(it, sources, names);
-				it++;
-				return ret;
-			} else if (++buckets_it != buckets_end) {
-				it = &*buckets_it->get().begin();
-				end = &*buckets_it->get().end();
-				continue;
-			} else {
-				return nullptr;
-			}
-		}
-	}
-};
-
-namespace client {
-	class [[cheerp::genericjs]] MappingObject: public Object {
+namespace [[cheerp::genericjs]] client {
+	class MappingObject: public Object {
 	public:
 		void set_line(client::Object*);
 		void set_column(client::Object*);
+		void set_originalLine(client::Object*);
+		void set_originalColumn(client::Object*);
+		void set_generatedLine(client::Object*);
+		void set_generatedColumn(client::Object*);
 		void set_lastColumn(client::Object*);
+		void set_lastGeneratedColumn(client::Object*);
 		void set_source(client::String*);
 		void set_name(client::String*);
+	};
+	class MappingCallback {
+	public:
+		void call(Object* context, MappingObject* mapping);
 	};
 }
 
@@ -233,11 +180,6 @@ public:
 			m,
 			cmp::ByOriginalLocationOnly()
 		);
-		MappingsIterator* iter = new MappingsIterator(
-			&*lower,
-			&*by_original.end(),
-			sources, names
-		);
 		if (!has_original_column)
 			original_line = lower->original->line;
 		original_column = lower->original->column;
@@ -253,34 +195,67 @@ public:
 			if (has_original_column && original.column != original_column)  {
 				return ret;
 			}
-			client::MappingObject* orig = new client::MappingObject();
-			orig->set_line(nullable<double>(it->generated_line));
-			orig->set_column(nullable<double>(it->generated_column));
+			client::MappingObject* m = new client::MappingObject();
+			m->set_line(nullable<double>(it->generated_line));
+			m->set_column(nullable<double>(it->generated_column));
 			nullable<double> last_column;
 			if (it->last_generated_column) {
 				last_column = *it->last_generated_column;
 			}
 			else if (ptr->computed_column_spans)
 				last_column = std::numeric_limits<double>::infinity();
-			orig->set_lastColumn(nullable<double>(last_column));
-			ret->push(orig);
+			m->set_lastColumn(last_column);
+			ret->push(m);
 		}
 		return ret;
 	}
-	MappingsIterator* by_generated_location() {
-		return new MappingsIterator(
-			&*ptr->by_generated.begin(),
-			&*ptr->by_generated.end(),
-			sources, names
-		);
-	}
-	MappingsOriginalIterator* by_original_location() {
-		auto& source_buckets = ptr->source_buckets();
-		return new MappingsOriginalIterator(
-			&*source_buckets.begin(),
-			&*source_buckets.end(),
-			sources, names
-		);
+	void each_mapping(Order order, client::Object* context, client::MappingCallback* cb) {
+		auto map_to_cb = [this, cb, context](const RawMapping& raw) {
+			client::MappingObject* m = new client::MappingObject();
+			m->set_generatedLine(nullable<double>(raw.generated_line));
+			m->set_generatedColumn(nullable<double>(raw.generated_column));
+			nullable<double> last_column;
+			if (raw.last_generated_column) {
+				last_column = *raw.last_generated_column;
+			}
+			m->set_lastGeneratedColumn(last_column);
+			const auto& orig = raw.original;
+			if (orig) {
+				m->set_originalLine(nullable<double>(orig->line));
+				m->set_originalColumn(nullable<double>(orig->column));
+				if (orig->name)
+					m->set_name(names->at(*orig->name));
+				else
+					m->set_name(nullptr);
+				m->set_source(sources->at(orig->source));
+			} else {
+				m->set_originalLine(nullptr);
+				m->set_originalColumn(nullptr);
+				m->set_name(nullptr);
+				m->set_source(nullptr);
+			}
+			cb->call(context, m);
+		};
+		if (order == Order::Generated) {
+			RawMapping* begin = &*ptr->by_generated.begin();
+			RawMapping* end = &*ptr->by_generated.end();
+			for (RawMapping* it = begin; it != end; ++it) {
+				map_to_cb(*it);
+			}
+		} else if (order == Order::Original) {
+			auto& source_buckets = ptr->source_buckets();
+			auto* begin = &*source_buckets.begin();
+			auto* end = &*source_buckets.end();
+			for (auto* bucket = begin; bucket != end; ++bucket) {
+				const auto* bucket_begin = &* bucket->get().begin();
+				const auto* bucket_end = &*bucket->get().end();
+				for (const auto* raw = bucket_begin; raw != bucket_end; ++raw) {
+					map_to_cb(*raw);
+				}
+			}
+		} else {
+			throw_string("Unknown order of iteration");
+		}
 	}
 	void destroy() {
 		if (ptr) {

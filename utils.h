@@ -143,6 +143,12 @@ enum Error {
 	VlqInvalidBase64 = 4,
 	VlqOverflow = 5,
 };
+
+
+[[cheerp::genericjs]]
+[[noreturn]]
+void throw_string(const client::String& s);
+
 [[cheerp::genericjs]]
 [[noreturn]]
 void throw_error(Error e);
