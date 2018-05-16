@@ -237,7 +237,7 @@ extern "C"  void test() {
 
 	for(int i = 0; i < 5; i++) {
 		std::string::const_iterator it = test[i].begin();
-		std::cout<<"test vlq "<<i<<":"<<test[i]<<" -> "<<vlq_decode(it)<<std::endl;
+		std::cout<<"test vlq "<<i<<":"<<test[i]<<" -> "<<vlq_decode(it).first<<std::endl;
 		assert(it==test[i].end());
 	}
 
