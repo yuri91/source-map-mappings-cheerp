@@ -66,12 +66,12 @@ struct RawMapping {
 #endif
 };
 namespace cmp {
-	class ByOriginalLocation;
+	class Comparator;
 }
 class RawMappings {
 public:
 	using LazyMappings = std::vector<
-		LazilySorted<RawMapping, cmp::ByOriginalLocation>
+		LazilySorted<RawMapping, cmp::Comparator>
 	>;
 #ifdef DEBUG
 	void dump(indent ind = indent(0)) const {

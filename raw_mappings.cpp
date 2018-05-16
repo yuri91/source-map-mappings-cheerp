@@ -34,7 +34,7 @@ const RawMapping* RawMappings::original_location_for (
 			by_generated.begin(),
 			by_generated.end(),
 			m,
-			cmp::ByGeneratedLocationOnly()
+			cmp::Comparator(cmp::Comparator::Mode::ByGeneratedLocationOnly)
 		);
 		if (it == by_generated.begin())
 			return nullptr;
@@ -44,7 +44,7 @@ const RawMapping* RawMappings::original_location_for (
 			by_generated.begin(),
 			by_generated.end(),
 			m,
-			cmp::ByGeneratedLocationOnly()
+			cmp::Comparator(cmp::Comparator::Mode::ByGeneratedLocationOnly)
 		);
 		if (it == by_generated.end())
 			return nullptr;
@@ -80,7 +80,7 @@ const RawMapping* RawMappings::generated_location_for (
 			by_original.begin(),
 			by_original.end(),
 			m,
-			cmp::ByOriginalLocationOnly()
+			cmp::Comparator(cmp::Comparator::Mode::ByOriginalLocationOnly)
 		);
 		if (it == by_original.begin())
 			return nullptr;
@@ -90,7 +90,7 @@ const RawMapping* RawMappings::generated_location_for (
 			by_original.begin(),
 			by_original.end(),
 			m,
-			cmp::ByOriginalLocationOnly()
+			cmp::Comparator(cmp::Comparator::Mode::ByOriginalLocationOnly)
 		);
 		if (it == by_original.end())
 			return nullptr;
@@ -119,7 +119,7 @@ std::pair<RawMappings*, Error> RawMappings::create(const std::string& input) {
 	std::vector<RawMapping> by_generated;
 	by_generated.reserve(in_len / 2);
 
-	cmp::ByGeneratedLocationTail comparator;
+	cmp::Comparator comparator(cmp::Comparator::Mode::ByGeneratedLocationTail);
 	for (auto it = in_begin; it != in_end;) {
 		if (*it ==  ';') {
 			generated_line++;

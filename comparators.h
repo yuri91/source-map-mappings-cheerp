@@ -183,6 +183,42 @@ struct ByGeneratedLocationTail {
 	}
 };
 
+struct Comparator {
+	enum class Mode {
+		ByGeneratedLocation,
+		ByGeneratedLocationOnly,
+		ByGeneratedLocationTail,
+		ByOriginalLocation,
+		ByOriginalLocationOnly,
+	};
+	Mode mode;
+	Comparator(Mode m = Mode::ByOriginalLocation): mode(m) {}
+	bool operator()(const RawMapping& m1, const RawMapping& m2) const {
+		switch (mode) {
+		case Mode::ByGeneratedLocationOnly: {
+			ByGeneratedLocationOnly cmp;
+			return cmp(m1,m2);
+		}
+		case Mode::ByGeneratedLocation: {
+			ByGeneratedLocation cmp;
+			return cmp(m1,m2);
+		}
+		case Mode::ByGeneratedLocationTail: {
+			ByGeneratedLocationTail cmp;
+			return cmp(m1,m2);
+		}
+		case Mode::ByOriginalLocationOnly: {
+			ByOriginalLocationOnly cmp;
+			return cmp(m1,m2);
+		}
+		case Mode::ByOriginalLocation: {
+			ByOriginalLocation cmp;
+			return cmp(m1,m2);
+		}
+		}
+	}
+};
+
 }
 
 #endif
