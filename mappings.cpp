@@ -11,72 +11,10 @@ enum class Order {
 	Original = 2
 };
 
-class [[cheerp::jsexport]] [[cheerp::genericjs]] Mapping {
-public:
-	uint32_t get_generated_line(){
-		return generated_line;
-	}
-	uint32_t get_generated_column(){
-		return generated_column;
-	}
-	client::String* get_source(){
-		return source;
-	}
-	client::Object* get_original_line(){
-		return original_line;
-	}
-	client::Object* get_original_column(){
-		return original_column;
-	}
-	client::String* get_name() {
-		return name;
-	}
-	client::Object* get_last_generated_column() {
-		return last_generated_column;
-	}
-	Mapping(const RawMapping* ptr, const ArraySet* sources, const ArraySet* names)
-		: generated_line(ptr->generated_line)
-		, generated_column(ptr->generated_column)
-	{
-		if (ptr->original) {
-			const auto& original = *ptr->original;
-			source = sources->at(original.source);
-			original_line = original.line;
-			original_column = original.column;
-			if (original.name)
-				name = names->at(*original.name);
-		}
-		if (ptr->last_generated_column) {
-			last_generated_column = *ptr->last_generated_column;
-		}
-	}
-private:
-	uint32_t generated_line;
-	uint32_t generated_column;
-	client::String* source;
-	client::String* name;
-	nullable<double> original_line;
-	nullable<double> original_column;
-	nullable<double> last_generated_column;
-};
-
 namespace [[cheerp::genericjs]] client {
-	class MappingObject: public Object {
-	public:
-		void set_line(client::Object*);
-		void set_column(client::Object*);
-		void set_originalLine(client::Object*);
-		void set_originalColumn(client::Object*);
-		void set_generatedLine(client::Object*);
-		void set_generatedColumn(client::Object*);
-		void set_lastColumn(client::Object*);
-		void set_lastGeneratedColumn(client::Object*);
-		void set_source(client::String*);
-		void set_name(client::String*);
-	};
 	class MappingCallback {
 	public:
-		void call(Object* context, MappingObject* mapping);
+		void call(Object* context, Object* mapping);
 	};
 }
 
@@ -97,7 +35,7 @@ public:
 	void compute_column_spans() {
 		ptr->compute_column_spans();
 	}
-	client::MappingObject* original_location_for(
+	client::Object* original_location_for(
 		uint32_t generated_line,
 		uint32_t generated_column,
 		Bias bias
@@ -107,25 +45,21 @@ public:
 			generated_column,
 			bias
 		);
-		client::MappingObject* ret = new client::MappingObject();
-		if (raw==nullptr || !raw->original) {
-			ret->set_line(nullptr);
-			ret->set_column(nullptr);
-			ret->set_name(nullptr);
-			ret->set_source(nullptr);
-		} else {
+		client::Object* line = nullptr;
+		client::Object* column = nullptr;
+		client::String* name = nullptr;
+		client::String* source = nullptr;
+		if (raw!=nullptr && raw->original) {
 			const auto& orig = raw->original;
-			ret->set_line(nullable<double>(orig->line));
-			ret->set_column(nullable<double>(orig->column));
+			line = nullable<double>(orig->line);
+			column = nullable<double>(orig->column);
 			if (orig->name)
-				ret->set_name(names->at(*orig->name));
-			else
-				ret->set_name(nullptr);
-			ret->set_source(sources->at(orig->source));
+				name = names->at(*orig->name);
+			source = sources->at(orig->source);
 		}
-		return ret;
+		return CHEERP_OBJECT(line, column, name, source);
 	}
-	client::MappingObject* generated_location_for(
+	client::Object* generated_location_for(
 		uint32_t source,
 		uint32_t original_line,
 		uint32_t original_column,
@@ -137,25 +71,21 @@ public:
 			original_column,
 			bias
 		);
-		client::MappingObject* ret = new client::MappingObject();
-		if (raw == nullptr) {
-			ret->set_line(nullptr);
-			ret->set_column(nullptr);
-			ret->set_lastColumn(nullptr);
-		} else {
-			ret->set_line(nullable<double>(raw->generated_line));
-			ret->set_column(nullable<double>(raw->generated_column));
-			nullable<double> last_column;
+		client::Object* line = nullptr;
+		client::Object* column = nullptr;
+		client::Object* lastColumn = nullptr;
+		if (raw != nullptr) {
+			line = nullable<double>(raw->generated_line);
+			column =nullable<double>(raw->generated_column);
 			if (raw->last_generated_column) {
-				last_column = *raw->last_generated_column;
+				lastColumn = nullable<double>(*raw->last_generated_column);
 			}
 			else if (ptr->computed_column_spans)
-				last_column = std::numeric_limits<double>::infinity();
-			ret->set_lastColumn(last_column);
+				lastColumn = nullable<double>(std::numeric_limits<double>::infinity());
 		}
-		return ret;
+		return CHEERP_OBJECT(line, column, lastColumn);
 	}
-	client::TArray<client::MappingObject>* all_generated_locations_for(
+	client::TArray<client::Object>* all_generated_locations_for(
 		uint32_t source,
 		uint32_t original_line,
 		bool has_original_column,
@@ -184,7 +114,7 @@ public:
 			original_line = lower->original->line;
 		original_column = lower->original->column;
 
-		client::TArray<client::MappingObject>* ret = new client::TArray<client::MappingObject>();
+		client::TArray<client::Object>* ret = new client::TArray<client::Object>();
 		for (auto it = lower; it != by_original.end(); ++it) {
 			if (!it->original)
 				return ret;
@@ -195,45 +125,47 @@ public:
 			if (has_original_column && original.column != original_column)  {
 				return ret;
 			}
-			client::MappingObject* m = new client::MappingObject();
-			m->set_line(nullable<double>(it->generated_line));
-			m->set_column(nullable<double>(it->generated_column));
-			nullable<double> last_column;
+			double line = it->generated_line;
+			double column = it->generated_column;
+			client::Object* lastColumn = nullptr;
 			if (it->last_generated_column) {
-				last_column = *it->last_generated_column;
+				lastColumn = nullable<double>(*it->last_generated_column);
 			}
 			else if (ptr->computed_column_spans)
-				last_column = std::numeric_limits<double>::infinity();
-			m->set_lastColumn(last_column);
-			ret->push(m);
+				lastColumn = nullable<double>(std::numeric_limits<double>::infinity());
+			ret->push(CHEERP_OBJECT(line, column, lastColumn));
 		}
 		return ret;
 	}
 	void each_mapping(Order order, client::Object* context, client::MappingCallback* cb) {
 		auto map_to_cb = [this, cb, context](const RawMapping& raw) {
-			client::MappingObject* m = new client::MappingObject();
-			m->set_generatedLine(nullable<double>(raw.generated_line));
-			m->set_generatedColumn(nullable<double>(raw.generated_column));
-			nullable<double> last_column;
+			client::Object* generatedLine = nullable<double>(raw.generated_line);
+			client::Object* generatedColumn = nullable<double>(raw.generated_column);
+			client::Object* lastGeneratedColumn = nullptr;
 			if (raw.last_generated_column) {
-				last_column = *raw.last_generated_column;
+				lastGeneratedColumn = nullable<double>(*raw.last_generated_column);
 			}
-			m->set_lastGeneratedColumn(last_column);
+			client::Object* originalLine = nullptr;
+			client::Object* originalColumn = nullptr;
+			client::String* source = nullptr;
+			client::String* name = nullptr;
 			const auto& orig = raw.original;
 			if (orig) {
-				m->set_originalLine(nullable<double>(orig->line));
-				m->set_originalColumn(nullable<double>(orig->column));
+				originalLine = nullable<double>(orig->line);
+				originalColumn = nullable<double>(orig->column);
 				if (orig->name)
-					m->set_name(names->at(*orig->name));
-				else
-					m->set_name(nullptr);
-				m->set_source(sources->at(orig->source));
-			} else {
-				m->set_originalLine(nullptr);
-				m->set_originalColumn(nullptr);
-				m->set_name(nullptr);
-				m->set_source(nullptr);
+					name = names->at(*orig->name);
+				source = sources->at(orig->source);
 			}
+			client::Object* m = CHEERP_OBJECT(
+				generatedLine,
+				generatedColumn,
+				lastGeneratedColumn,
+				originalLine,
+				originalColumn,
+				source,
+				name
+			);
 			cb->call(context, m);
 		};
 		if (order == Order::Generated) {
