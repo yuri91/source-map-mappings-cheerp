@@ -17,8 +17,7 @@ public:
 	const std::vector<T>& get() {
 		if(sorted)
 			return vec;
-		C cmp;
-		std::sort(vec.begin(), vec.end(), cmp);
+		std::sort(vec.begin(), vec.end(), C());
 		return vec;
 	}
 	void push_back(T elem) {

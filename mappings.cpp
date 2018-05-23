@@ -108,7 +108,7 @@ public:
 			by_original.begin(),
 			by_original.end(),
 			m,
-			cmp::Comparator(cmp::Comparator::Mode::ByOriginalLocation)
+			cmp::Comparator(cmp::Comparator::Mode::ByOriginalLocationLineColumn)
 		);
 		if (!has_original_column)
 			original_line = lower->original->line;
