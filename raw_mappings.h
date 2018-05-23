@@ -18,6 +18,7 @@ public:
 		if(sorted)
 			return vec;
 		std::sort(vec.begin(), vec.end(), C());
+		sorted = true;
 		return vec;
 	}
 	void push_back(T elem) {
