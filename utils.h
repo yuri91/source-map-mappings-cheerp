@@ -2,7 +2,6 @@
 #define _UTILS_H_
 
 #include <string>
-#include <experimental/optional>
 
 #include  <cheerp/client.h>
 #include <type_traits>
@@ -115,10 +114,6 @@ public:
 		return 0;
 	}
 };
-
-template<class T>
-using optional = std::experimental::optional<T>;
-
 
 #ifdef DEBUG
 #include <iostream>

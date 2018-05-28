@@ -4,6 +4,7 @@
 #include "utils.h"
 
 #include <vector>
+#include <optional>
 
 enum class Bias {
 	GreatestLowerBound = 1,
@@ -34,14 +35,14 @@ struct OriginalLocation {
 	uint32_t source{0};
 	uint32_t line{0};
 	uint32_t column{0};
-	optional<uint32_t> name;
+	std::optional<uint32_t> name;
 };
 
 struct RawMapping {
 	uint32_t generated_line{0};
 	uint32_t generated_column{0};
-	optional<OriginalLocation> original;
-	optional<uint32_t> last_generated_column;
+	std::optional<OriginalLocation> original;
+	std::optional<uint32_t> last_generated_column;
 #ifdef DEBUG
 	void dump(indent ind = indent(0)) const {
 		std::cout
@@ -119,7 +120,7 @@ public:
 private:
 	LazyMappings& source_buckets_slow();
 
-	optional<LazyMappings> by_original;
+	std::optional<LazyMappings> by_original;
 };
 
 #endif
