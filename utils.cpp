@@ -13,7 +13,7 @@ std::ostream& operator<<(std::ostream& os, const indent& ind) {
 [[noreturn]]
 void throw_error(Error e) {
 	client::String* msg = new client::String("Error parsing mappings (code ");
-	msg = msg->concat(e)->concat("): ");
+	msg = msg->concat(e, "): ");
 	switch (e) {
 	case Error::UnexpectedNegativeNumber:
 		msg = msg->concat("the mappings contained a negative line, column, source index, or name index");
